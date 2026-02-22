@@ -1,0 +1,32 @@
+# Environments
+.venv/
+venv/
+
+
+
+# Sensitive Data
+Credentials/.env
+.env
+*.config
+*.json
+!Credentials/
+
+# Project Specific Data & Models
+data/uploads/
+data/sentinel_db/
+data/embeddings/
+data/processed/
+data/raw/
+cache/
+models/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# System
+.DS_Store
+Thumbs.db
+*.log

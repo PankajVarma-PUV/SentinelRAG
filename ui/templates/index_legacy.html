@@ -1,0 +1,1318 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>SentinelRAG – Document Intelligence</title>
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🛡️</text></svg>">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description"
+        content="Multi-Agent RAG with Hallucination Prevention - A correct refusal is better than a confident hallucination." />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background: radial-gradient(circle at top right, #0f172a, #020617);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        /* Loading animation */
+        .loading-dots span {
+            animation: bounce 1.4s infinite ease-in-out both;
+        }
+
+        .loading-dots span:nth-child(1) {
+            animation-delay: -0.32s;
+        }
+
+        .loading-dots span:nth-child(2) {
+            animation-delay: -0.16s;
+        }
+
+        .loading-dots span:nth-child(3) {
+            animation-delay: 0s;
+        }
+
+        @keyframes bounce {
+
+            0%,
+            80%,
+            100% {
+                transform: scale(0.6);
+                opacity: 0.5;
+            }
+
+            40% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        /* UI Elements */
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .input-glass {
+            background: rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .input-glass:focus {
+            border-color: rgba(6, 182, 212, 0.5);
+            box-shadow: 0 0 15px rgba(6, 182, 212, 0.1);
+        }
+
+        /* Premium Task Cards (Generative UI) */
+        .task-card {
+            background: rgba(30, 41, 59, 0.4);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 20px;
+            margin: 24px 0;
+            overflow: hidden;
+            opacity: 0;
+            transform: translateY(20px);
+            animation: cardEnter 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+            box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.5);
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        /* Staggered animation classes */
+        .task-card:nth-child(2) {
+            animation-delay: 0.1s;
+        }
+
+        .task-card:nth-child(3) {
+            animation-delay: 0.2s;
+        }
+
+        .task-card:nth-child(4) {
+            animation-delay: 0.3s;
+        }
+
+        .task-card:hover {
+            transform: translateY(-4px) scale(1.01);
+            box-shadow: 0 20px 50px -10px rgba(0, 0, 0, 0.7);
+            border-color: rgba(255, 255, 255, 0.15);
+            background: rgba(30, 41, 59, 0.5);
+        }
+
+        @keyframes cardEnter {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .card-header {
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: rgba(255, 255, 255, 0.03);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .card-title-group {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .card-title {
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        .card-body {
+            padding: 24px;
+            font-size: 0.95rem;
+            line-height: 1.7;
+            color: rgba(255, 255, 255, 0.95);
+        }
+
+        /* Variant Colors */
+        .task-translation {
+            border-top: 4px solid #3b82f6;
+        }
+
+        .task-translation .card-title {
+            color: #60a5fa;
+        }
+
+        .task-summary {
+            border-top: 4px solid #10b981;
+        }
+
+        .task-summary .card-title {
+            color: #34d399;
+        }
+
+        .task-rewrite {
+            border-top: 4px solid #8b5cf6;
+        }
+
+        .task-rewrite .card-title {
+            color: #a78bfa;
+        }
+
+        .task-default {
+            border-top: 4px solid #64748b;
+        }
+
+        .copy-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 0.65rem;
+            color: rgba(255, 255, 255, 0.6);
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+
+        .copy-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+        }
+
+        .task-icon {
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        /* Vision Cards */
+        .vision-card {
+            background: linear-gradient(135deg, rgba(6, 182, 212, 0.15) 0%, rgba(59, 130, 246, 0.1) 100%);
+            border: 1px solid rgba(6, 182, 212, 0.3);
+            border-radius: 24px;
+            margin: 20px 0;
+            overflow: hidden;
+            box-shadow: 0 15px 35px -5px rgba(0, 0, 0, 0.4), 0 0 20px rgba(6, 182, 212, 0.1);
+            position: relative;
+        }
+
+        .vision-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(6, 182, 212, 0.5), transparent);
+        }
+
+        .vision-header {
+            padding: 14px 24px;
+            background: rgba(6, 182, 212, 0.1);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            border-bottom: 1px solid rgba(6, 182, 212, 0.2);
+        }
+
+        .vision-title {
+            font-size: 0.75rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            color: #22d3ee;
+        }
+
+        .vision-body {
+            padding: 24px;
+            font-size: 1rem;
+            line-height: 1.8;
+            color: #e2e8f0;
+            font-weight: 500;
+        }
+
+        .vision-tag {
+            background: #0891b2;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.65rem;
+            font-weight: 700;
+        }
+    </style>
+</head>
+
+<body class="h-screen text-gray-200 flex overflow-hidden">
+
+    <!-- Sidebar -->
+    <aside class="w-72 glass-panel border-r border-white/5 flex flex-col z-20">
+        <div class="px-6 py-8 flex items-center gap-3">
+            <div
+                class="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+                <span class="text-white text-xl">🛡️</span>
+            </div>
+            <div
+                class="font-bold text-xl tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">
+                SentinelRAG
+            </div>
+        </div>
+
+        <div class="px-5 mb-6">
+            <button id="newChatBtn"
+                class="w-full bg-white/10 hover:bg-white/15 text-white font-medium py-3 rounded-xl transition-all border border-white/5 flex items-center justify-center gap-2 group">
+                <span class="text-lg opacity-60 group-hover:opacity-100">+</span> New Conversation
+            </button>
+        </div>
+
+        <div class="px-5 mb-4">
+            <div class="relative">
+                <span class="absolute left-3 top-1/2 -translate-y-1/2 opacity-40 text-xs">🔍</span>
+                <input type="text" id="searchChats" placeholder="Find a chat..."
+                    class="w-full bg-white/5 border border-white/5 rounded-lg pl-9 pr-3 py-2.5 text-xs focus:outline-none focus:border-cyan-500/30 transition-all font-medium" />
+            </div>
+        </div>
+
+        <nav class="px-4 text-sm flex-1 flex flex-col min-h-0">
+            <div class="opacity-60 uppercase text-xs mb-2">Recent Chats</div>
+            <div id="conversationList" class="space-y-1 max-h-48 overflow-y-auto flex-shrink-0 mb-4">
+                <!-- Conversations will be loaded here dynamically -->
+                <div class="text-xs opacity-50 py-2">No conversations yet</div>
+            </div>
+
+            <div class="opacity-60 uppercase text-xs mt-2 mb-2">Workspace</div>
+            <div id="sourceFilesBtn"
+                class="hover:bg-white/10 rounded px-3 py-2 cursor-pointer flex items-center gap-2 transition-colors">
+                <span>📄</span> Source Files
+                <span id="fileCount" class="ml-auto text-xs bg-white/10 px-2 py-0.5 rounded">0</span>
+            </div>
+
+            <div class="opacity-60 uppercase text-xs mt-6 mb-2">System Status</div>
+            <div id="systemStatus" class="px-3 py-2 text-xs">
+                <div class="flex items-center gap-2">
+                    <span id="statusDot" class="w-2 h-2 rounded-full bg-yellow-500"></span>
+                    <span id="statusText">Initializing...</span>
+                </div>
+                <div id="dbStatus" class="flex items-center gap-2 mt-1">
+                    <span id="dbDot" class="w-2 h-2 rounded-full bg-gray-500"></span>
+                    <span id="dbText">Database: checking...</span>
+                </div>
+            </div>
+        </nav>
+
+        <div class="mt-auto px-4 py-4 text-xs opacity-50 border-t border-white/10">
+            SentinelRAG © 2026 • Hallucination-Resistant AI
+        </div>
+    </aside>
+
+    <!-- Main Area -->
+    <main class="flex-1 flex flex-col relative">
+
+        <!-- Header -->
+        <header class="h-20 flex items-center justify-between px-8 glass-panel border-b border-white/5 z-10">
+            <div>
+                <div class="text-xs font-bold uppercase tracking-widest text-cyan-500 mb-0.5">Hallucination Guard Active
+                </div>
+                <div class="text-sm opacity-60 font-medium">Multi-Agent RAG Orchestration Engine</div>
+            </div>
+            <div class="flex items-center gap-5">
+                <button id="healthCheckBtn"
+                    class="text-[10px] font-bold uppercase tracking-widest text-white/50 hover:text-white bg-white/5 hover:bg-white/10 px-4 py-2 rounded-lg transition-all border border-white/5">
+                    Sync Status
+                </button>
+                <div class="relative">
+                    <div id="profileBtn"
+                        class="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-600 to-blue-700 flex items-center justify-center text-white font-bold cursor-pointer shadow-lg shadow-cyan-500/10 border border-white/10 ring-4 ring-transparent hover:ring-cyan-500/20 transition-all">
+                        PV</div>
+                    <div id="contactPopup"
+                        class="hidden absolute right-0 top-14 glass-panel rounded-2xl p-6 text-sm z-50 w-72 shadow-2xl border-white/20">
+                        <div class="font-bold mb-4 text-cyan-400 uppercase tracking-widest text-xs">Professional Contact
+                        </div>
+                        <div class="space-y-4">
+                            <div class="flex items-center gap-3">
+                                <div
+                                    class="w-8 h-8 rounded-lg bg-cyan-500/10 flex items-center justify-center text-cyan-400">
+                                    📱</div>
+                                <div class="font-medium text-gray-300">+91 9372123700</div>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <div
+                                    class="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-400">
+                                    ✉️</div>
+                                <div class="font-medium text-gray-300">pv43770@gmail.com</div>
+                            </div>
+                        </div>
+                        <div class="text-[10px] opacity-40 mt-6 pt-4 border-t border-white/5 leading-relaxed">Available
+                            for innovative AI/Full-Stack opportunities. Let's build the future together.</div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Chat Window -->
+        <section id="chatWindow" class="flex-1 overflow-y-auto px-6 py-4 space-y-6">
+
+            <div class="max-w-3xl bg-white/5 p-4 rounded-xl">
+                <div class="text-sm">Hello! I am <strong class="text-cyan-400">SentinelRAG</strong>. Upload documents or
+                    ask questions grounded in your data.</div>
+                <div class="text-xs opacity-50 mt-2 flex items-center gap-2">
+                    <span class="w-1.5 h-1.5 rounded-full bg-cyan-500"></span> System
+                </div>
+            </div>
+
+        </section>
+
+        <!-- Input Area -->
+        <footer class="px-8 py-6 max-w-5xl mx-auto w-full">
+            <!-- Attached files container -->
+            <div id="attachedFileIndicator" class="hidden mb-4 flex flex-wrap gap-2">
+                <!-- Chips will be rendered here -->
+            </div>
+
+            <div
+                class="relative glass-panel rounded-3xl p-2.5 shadow-2xl flex items-end gap-2 group focus-within:ring-2 ring-cyan-500/30 transition-all border-white/10">
+                <!-- Upload button -->
+                <label
+                    class="cursor-pointer bg-white/5 hover:bg-white/10 p-4 rounded-2xl transition-all flex items-center justify-center border border-white/5"
+                    title="Knowledge Source">
+                    <span class="text-xl opacity-60">📎</span>
+                    <input id="fileInput" type="file"
+                        accept=".pdf,.txt,.md,.docx,.png,.jpg,.jpeg,.mp3,.wav,.mp4,.mov,.webm" hidden />
+                </label>
+
+                <textarea id="userInput" rows="1" placeholder="Type a message or instruction..."
+                    class="flex-1 bg-transparent border-none rounded-2xl p-4 resize-none focus:outline-none text-white text-sm font-medium placeholder:opacity-40 min-h-[56px] max-h-48"></textarea>
+
+                <button id="sendBtn"
+                    class="bg-gradient-to-br from-cyan-500 to-blue-600 hover:shadow-lg hover:shadow-cyan-500/20 disabled:opacity-30 disabled:grayscale text-white font-bold p-4 rounded-2xl transition-all h-[56px] w-[56px] flex items-center justify-center">
+                    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="22" y1="2" x2="11" y2="13"></line>
+                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Upload progress/status -->
+            <div class="mt-2 flex items-center gap-3">
+                <div id="uploadProgress" class="text-xs text-cyan-400 hidden">
+                    <span class="loading-dots inline-flex gap-1">
+                        <span class="w-1.5 h-1.5 bg-cyan-400 rounded-full"></span>
+                        <span class="w-1.5 h-1.5 bg-cyan-400 rounded-full"></span>
+                        <span class="w-1.5 h-1.5 bg-cyan-400 rounded-full"></span>
+                    </span>
+                    <span id="uploadStatusText">Uploading...</span>
+                </div>
+                <div id="uploadSuccess" class="text-xs text-green-400 hidden"></div>
+                <div id="uploadError" class="text-xs text-red-400 hidden"></div>
+            </div>
+
+            <div class="text-xs opacity-40 mt-2 text-center">
+                Press Enter to send • Shift+Enter for new line • 📎 to attach files
+            </div>
+        </footer>
+
+    </main>
+
+    <script>
+        // =============================================================================
+        // DOM ELEMENTS
+        // =============================================================================
+        const chatWindow = document.getElementById('chatWindow');
+        const sendBtn = document.getElementById('sendBtn');
+        const userInput = document.getElementById('userInput');
+        const newChatBtn = document.getElementById('newChatBtn');
+        const fileInput = document.getElementById('fileInput');
+        const uploadProgress = document.getElementById('uploadProgress');
+        const uploadStatusText = document.getElementById('uploadStatusText');
+        const uploadSuccess = document.getElementById('uploadSuccess');
+        const uploadError = document.getElementById('uploadError');
+        const healthCheckBtn = document.getElementById('healthCheckBtn');
+        const statusDot = document.getElementById('statusDot');
+        const statusText = document.getElementById('statusText');
+        const fileCount = document.getElementById('fileCount');
+        const conversationList = document.getElementById('conversationList');
+        const dbDot = document.getElementById('dbDot');
+        const dbText = document.getElementById('dbText');
+        const searchChats = document.getElementById('searchChats');
+        const attachedFileIndicator = document.getElementById('attachedFileIndicator');
+        const attachedFileName = document.getElementById('attachedFileName');
+        const clearAttachment = document.getElementById('clearAttachment');
+
+        // =============================================================================
+        // STATE
+        // =============================================================================
+        let isLoading = false;
+        let isUploading = false;
+        let chatHistory = [];
+        let currentConversationId = null;
+        let conversations = [];
+        let pendingFiles = []; // Files staged for upload
+        let dbConnected = false;
+
+        // =============================================================================
+        // UTILITIES
+        // =============================================================================
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function setLoading(loading) {
+            isLoading = loading;
+            sendBtn.disabled = loading;
+            userInput.disabled = loading;
+            if (loading) {
+                sendBtn.textContent = '...';
+            } else {
+                sendBtn.textContent = 'Send';
+            }
+        }
+
+        function hideUploadMessages() {
+            uploadProgress.classList.add('hidden');
+            uploadSuccess.classList.add('hidden');
+            uploadError.classList.add('hidden');
+        }
+
+        function renderPendingFiles() {
+            if (pendingFiles.length === 0) {
+                attachedFileIndicator.classList.add('hidden');
+                return;
+            }
+
+            attachedFileIndicator.classList.remove('hidden');
+            attachedFileIndicator.innerHTML = '';
+
+            pendingFiles.forEach((file, index) => {
+                const chip = document.createElement('div');
+                chip.className = 'flex items-center gap-2 bg-white/5 border border-white/10 px-3 py-1.5 rounded-xl text-xs';
+
+                const icon = document.createElement('span');
+                icon.textContent = getFileIcon(file.name);
+
+                const name = document.createElement('span');
+                name.className = 'font-medium truncate max-w-[150px]';
+                name.textContent = file.name;
+
+                const removeBtn = document.createElement('button');
+                removeBtn.className = 'hover:text-red-400 p-0.5 transition-colors';
+                removeBtn.innerHTML = '✕';
+                removeBtn.onclick = () => {
+                    pendingFiles.splice(index, 1);
+                    renderPendingFiles();
+                };
+
+                chip.appendChild(icon);
+                chip.appendChild(name);
+                chip.appendChild(removeBtn);
+                attachedFileIndicator.appendChild(chip);
+            });
+        }
+
+        function getFileIcon(filename) {
+            const ext = filename.split('.').pop().toLowerCase();
+            if (['png', 'jpg', 'jpeg', 'webp', 'gif'].includes(ext)) return '🖼️';
+            if (['mp3', 'wav', 'm4a'].includes(ext)) return '🎵';
+            if (['mp4', 'mov', 'webm'].includes(ext)) return '🎥';
+            if (['pdf'].includes(ext)) return '📄';
+            return '📎';
+        }
+
+        // =============================================================================
+        // MESSAGE RENDERING
+        // =============================================================================
+        function append(role, content, extra = {}) {
+            const div = document.createElement('div');
+
+            if (role === 'user') {
+                div.className = 'ml-auto max-w-2xl bg-white/10 backdrop-blur-md p-6 rounded-3xl border border-white/10 shadow-xl';
+                div.innerHTML = `
+                  <div class="text-sm font-medium leading-relaxed">${escapeHtml(content)}</div>
+                  <div class="text-[10px] font-bold uppercase tracking-widest text-cyan-500 mt-4 opacity-80">Message Sent</div>
+                `;
+            } else if (role === 'assistant') {
+                div.className = 'max-w-3xl mr-auto';
+                div.innerHTML = renderAssistantMessage(content, extra);
+            } else if (role === 'loading') {
+                div.className = 'max-w-xl glass-panel p-6 rounded-2xl border-white/10 shadow-2xl animate-pulse';
+                div.id = 'loadingMessage';
+                div.innerHTML = `
+                  <div class="flex items-center gap-5">
+                    <div class="relative">
+                        <div class="w-10 h-10 rounded-xl bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center">
+                            <span class="animate-spin text-xl">⏳</span>
+                        </div>
+                    </div>
+                    <div class="space-y-1.5">
+                        <div class="text-[10px] font-bold uppercase tracking-tighter text-cyan-500">Processing Request</div>
+                        <div class="text-xs font-semibold text-white/60">Coordinating multi-agent intelligence pipeline...</div>
+                    </div>
+                  </div>
+                `;
+            } else {
+                div.className = 'max-w-2xl bg-white/5 p-4 rounded-xl mx-auto border border-white/5';
+                div.innerHTML = `
+                  <div class="text-xs font-bold text-center opacity-40 uppercase tracking-widest mb-2">System Notification</div>
+                  <div class="text-sm text-center opacity-70">${content}</div>
+                `;
+            }
+
+            chatWindow.appendChild(div);
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+
+            return div;
+        }
+
+        function renderAssistantMessage(content, extra) {
+            const { shouldAnswer, confidence, confidenceLevel, citations, qualityWarnings, factScore, relevanceScore, showQualityIndicators, agentType } = extra;
+
+            function parseAndRenderTaskCards(text) {
+                const taskRegex = /\[TASK:([^\]]+)\]([\s\S]*?)\[\/TASK\]/g;
+                let lastIndex = 0;
+                let html = '';
+                let match;
+
+                while ((match = taskRegex.exec(text)) !== null) {
+                    const beforeText = text.substring(lastIndex, match.index).trim();
+                    if (beforeText) {
+                        html += `<div class="mb-6 text-sm leading-relaxed opacity-80 font-medium">${escapeHtml(beforeText).replace(/\n/g, '<br>')}</div>`;
+                    }
+
+                    const tagParts = match[1].split(':');
+                    const taskType = tagParts[0];
+                    const extraInfo = tagParts[1] || '';
+                    const taskContent = match[2].trim();
+
+                    html += renderTaskCard(taskType, taskContent, extraInfo);
+                    lastIndex = taskRegex.lastIndex;
+                }
+
+                const afterText = text.substring(lastIndex).trim();
+                if (afterText) {
+                    html += `<div class="mt-6 text-sm leading-relaxed opacity-80 font-medium">${escapeHtml(afterText).replace(/\n/g, '<br>')}</div>`;
+                }
+
+                return html || `<div class="text-sm leading-relaxed">${escapeHtml(text).replace(/\n/g, '<br>')}</div>`;
+            }
+
+            function parseAndRenderVisionCards(text) {
+                const visionRegex = /\[VISION_CARD:([^\]]+)\]([\s\S]*?)\[\/VISION_CARD\]/g;
+                let lastIndex = 0;
+                let html = '';
+                let match;
+
+                while ((match = visionRegex.exec(text)) !== null) {
+                    const beforeText = text.substring(lastIndex, match.index).trim();
+                    if (beforeText) {
+                        html += parseAndRenderTaskCards(beforeText);
+                    }
+
+                    const fileName = match[1].trim();
+                    const visionContent = match[2].trim();
+
+                    html += `
+                        <div class="vision-card">
+                            <div class="vision-header">
+                                <span class="vision-tag">AI VISION</span>
+                                <span class="vision-title">${fileName}</span>
+                            </div>
+                            <div class="vision-body">
+                                ${escapeHtml(visionContent).replace(/\n/g, '<br>')}
+                            </div>
+                        </div>
+                    `;
+                    lastIndex = visionRegex.lastIndex;
+                }
+
+                const afterText = text.substring(lastIndex).trim();
+                if (afterText) {
+                    html += parseAndRenderTaskCards(afterText);
+                }
+
+                return html || parseAndRenderTaskCards(text);
+            }
+
+            function renderTaskCard(type, content, extra) {
+                let iconSvg = '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>';
+                let title = type;
+                let cssClass = 'task-default';
+
+                switch (type) {
+                    case 'TRANSLATION':
+                        iconSvg = '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>';
+                        title = extra ? `${extra} Version` : 'Global Translation';
+                        cssClass = 'task-translation';
+                        break;
+                    case 'SUMMARY':
+                        iconSvg = '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="21" y1="10" x2="3" y2="10"></line><line x1="21" y1="6" x2="3" y2="6"></line><line x1="21" y1="14" x2="3" y2="14"></line><line x1="21" y1="18" x2="3" y2="18"></line></svg>';
+                        title = 'Executive Summary';
+                        cssClass = 'task-summary';
+                        break;
+                    case 'REWRITE':
+                        iconSvg = '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>';
+                        title = 'Polished Rewrite';
+                        cssClass = 'task-rewrite';
+                        break;
+                }
+
+                // Create ID for copying
+                const copyId = 'copy_' + Math.random().toString(36).substr(2, 9);
+
+                return `
+                    <div class="task-card ${cssClass}">
+                        <div class="card-header">
+                            <div class="card-title-group">
+                                <div class="task-icon">${iconSvg}</div>
+                                <span class="card-title">${title}</span>
+                            </div>
+                            <button class="copy-btn" onclick="copyContent('${copyId}')">Copy Result</button>
+                        </div>
+                        <div class="card-body" id="${copyId}">
+                            ${escapeHtml(content).replace(/\n/g, '<br>')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Parse [INTRO]...[/INTRO] structure
+            function renderStructuredResponse(text) {
+                const introMatch = text.match(/\[INTRO\]([\s\S]*?)\[\/INTRO\]/);
+                const contentMatch = text.match(/\[CONTENT\]([\s\S]*?)\[\/CONTENT\]/);
+                const closingMatch = text.match(/\[CLOSING\]([\s\S]*?)\[\/CLOSING\]/);
+
+                if (introMatch || contentMatch || closingMatch) {
+                    let html = '';
+                    if (introMatch) html += `<div class="text-[10px] font-black uppercase tracking-[.25em] text-cyan-500/50 mb-4">${escapeHtml(introMatch[1])}</div>`;
+                    if (contentMatch) html += parseAndRenderVisionCards(contentMatch[1]);
+                    else html += parseAndRenderVisionCards(text);
+                    if (closingMatch) html += `<div class="text-xs font-medium italic opacity-40 mt-6 border-t border-white/5 pt-4 text-right">${escapeHtml(closingMatch[1])}</div>`;
+                    return html;
+                }
+                return parseAndRenderVisionCards(text);
+            }
+
+            const mainContent = renderStructuredResponse(content);
+
+            // If showQualityIndicators is explicitly false, return just the content
+            if (showQualityIndicators === false) {
+                const label = agentType ? agentType.toUpperCase() : 'SENTINEL ENGINE';
+                return `
+                    <div class="space-y-4">
+                        ${mainContent}
+                        <div class="text-[9px] font-bold text-white/20 tracking-widest pt-4 flex items-center gap-2">
+                             <span class="w-1.5 h-1.5 rounded-full bg-cyan-500/30"></span> ${label} PROCESS COMPLETE
+                        </div>
+                    </div>
+                `;
+            }
+
+            // RAG-specific rendering (Confidence scores, etc.)
+            const score = factScore ?? confidence ?? 0;
+            const pct = Math.round(score * 100);
+            const relScore = relevanceScore ?? 1.0;
+            const relPct = Math.round(relScore * 100);
+
+            const levelClass = pct >= 85 ? 'text-emerald-400 border-emerald-500/20 bg-emerald-500/5' :
+                pct >= 65 ? 'text-amber-400 border-amber-500/20 bg-amber-500/5' :
+                    'text-red-400 border-red-500/20 bg-red-500/5';
+
+            return `
+                <div class="flex items-center gap-4 mb-6">
+                    <div class="px-4 py-2 rounded-xl border ${levelClass} flex flex-col items-center">
+                        <div class="text-[9px] font-black uppercase tracking-widest opacity-60">Confidence</div>
+                        <div class="text-lg font-bold">${pct}%</div>
+                    </div>
+                    <div class="flex-1 space-y-2">
+                        <div class="text-[10px] font-bold uppercase tracking-widest text-white/20">Source Fidelity</div>
+                        <div class="h-1.5 bg-white/5 rounded-full overflow-hidden">
+                            <div class="h-full bg-gradient-to-r from-cyan-500 to-blue-500 w-[${pct}%]"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="text-sm leading-relaxed py-2 font-medium">${mainContent}</div>
+
+                ${citations && citations.length > 0 ? `
+                <div class="mt-8 pt-6 border-t border-white/5">
+                    <div class="text-[10px] font-black uppercase tracking-widest text-white/20 mb-3">Intelligence Sources</div>
+                    <div class="grid grid-cols-1 gap-2">
+                        ${citations.map(c => `
+                            <div class="text-[11px] p-3 rounded-xl bg-white/5 border border-white/5 flex items-center justify-between group hover:bg-white/10 transition-all">
+                                <span class="font-bold text-gray-400 group-hover:text-cyan-400">${c.source_name || c.document}</span>
+                                <span class="text-white/20 font-black">P. ${c.page || 0}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+                ` : ''}
+
+                <div class="text-[9px] font-bold text-white/20 tracking-widest mt-8 flex items-center gap-2">
+                     <span class="w-1.5 h-1.5 rounded-full bg-cyan-500/30"></span> RAG PIPELINE VERIFIED
+                </div>
+            `;
+        }
+
+        // Add copy helper to window scope
+        window.copyContent = function (id) {
+            const el = document.getElementById(id);
+            const text = el.innerText;
+            navigator.clipboard.writeText(text).then(() => {
+                const btn = el.previousElementSibling.querySelector('.copy-btn');
+                const oldText = btn.innerText;
+                btn.innerText = 'Copied!';
+                btn.style.color = '#10b981';
+                setTimeout(() => {
+                    btn.innerText = oldText;
+                    btn.style.color = '';
+                }, 2000);
+            });
+        };
+
+        function removeLoadingMessage() {
+            const loading = document.getElementById('loadingMessage');
+            if (loading) loading.remove();
+        }
+
+        // =============================================================================
+        // API CALLS
+        // =============================================================================
+        async function sendQuery(query) {
+            const response = await fetch('/query', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    query: query,
+                    context: null,  // Context no longer used - documents accessed directly
+                    include_debug: false,
+                    conversation_id: currentConversationId
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.detail || `Query failed with status ${response.status}`);
+            }
+
+            return await response.json();
+        }
+
+        async function uploadFile(file) {
+            const formData = new FormData();
+            formData.append('file', file);
+            if (currentConversationId) {
+                formData.append('conversation_id', currentConversationId);
+            }
+
+            const response = await fetch('/upload', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.detail || 'Upload failed');
+            }
+
+            return await response.json();
+        }
+
+        async function checkHealth() {
+            try {
+                const response = await fetch('/health');
+                if (!response.ok) throw new Error('Health check failed');
+                return await response.json();
+            } catch (e) {
+                return { status: 'error', ready: false, chunks_count: 0, db_connected: false };
+            }
+        }
+
+        // =============================================================================
+        // CONVERSATION API
+        // =============================================================================
+        async function loadConversations() {
+            if (!dbConnected) return;
+
+            try {
+                const response = await fetch('/conversations');
+                if (!response.ok) return;
+                const data = await response.json();
+                conversations = data.conversations || [];
+                renderConversationList();
+            } catch (e) {
+                console.error('Failed to load conversations:', e);
+            }
+        }
+
+        async function createNewConversation() {
+            if (!dbConnected) {
+                // Just clear chat locally if no DB
+                currentConversationId = null;
+                chatHistory = [];
+                return null;
+            }
+
+            try {
+                const response = await fetch('/conversations', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({})
+                });
+                if (!response.ok) throw new Error('Failed to create conversation');
+                const data = await response.json();
+                currentConversationId = data.conversation_id;
+                await loadConversations();
+                return data;
+            } catch (e) {
+                console.error('Failed to create conversation:', e);
+                return null;
+            }
+        }
+
+        async function loadConversation(conversationId) {
+            if (!dbConnected) return;
+
+            try {
+                const response = await fetch(`/conversations/${conversationId}`);
+                if (!response.ok) throw new Error('Conversation not found');
+                const data = await response.json();
+
+                currentConversationId = conversationId;
+                chatHistory = [];
+
+                // Clear and rebuild chat window
+                chatWindow.innerHTML = '';
+
+                // Add system message
+                append('system', 'Loaded conversation history.');
+
+                // Render all messages
+                for (const msg of data.messages) {
+                    if (msg.role === 'user') {
+                        append('user', msg.content);
+                        chatHistory.push({ role: 'user', content: msg.content });
+                    } else if (msg.role === 'assistant') {
+                        const meta = msg.metadata || {};
+                        append('assistant', msg.content, {
+                            shouldAnswer: meta.should_answer,
+                            confidence: meta.confidence_score,
+                            confidenceLevel: meta.confidence_level,
+                            factScore: meta.fact_score,
+                            relevanceScore: meta.relevance_score,
+                            qualityWarnings: meta.quality_warnings,
+                            citations: meta.citations,
+                            showQualityIndicators: meta.show_quality_indicators,
+                            agentType: meta.agent_type
+                        });
+                        chatHistory.push({ role: 'assistant', content: msg.content, data: meta });
+                    }
+                }
+
+                // Highlight active conversation
+                renderConversationList();
+
+            } catch (e) {
+                console.error('Failed to load conversation:', e);
+                append('system', `❌ Failed to load conversation: ${e.message}`);
+            }
+        }
+
+        async function deleteConversation(conversationId) {
+            if (!dbConnected) return;
+            if (!confirm('Delete this conversation? This cannot be undone.')) return;
+
+            try {
+                const response = await fetch(`/conversations/${conversationId}`, {
+                    method: 'DELETE'
+                });
+                if (!response.ok) throw new Error('Failed to delete');
+
+                // If deleting current conversation, start new
+                if (currentConversationId === conversationId) {
+                    currentConversationId = null;
+                    chatHistory = [];
+                    chatWindow.innerHTML = '';
+                    append('system', 'Conversation deleted. Start a new chat!');
+                }
+
+                await loadConversations();
+            } catch (e) {
+                console.error('Failed to delete conversation:', e);
+                append('system', `❌ Failed to delete: ${e.message}`);
+            }
+        }
+
+        function renderConversationList() {
+            if (!conversationList) return;
+
+            if (conversations.length === 0) {
+                conversationList.innerHTML = '<div class="text-xs opacity-50 py-2">No conversations yet</div>';
+                return;
+            }
+
+            const searchTerm = searchChats ? searchChats.value.toLowerCase() : '';
+            const filtered = conversations.filter(c =>
+                !searchTerm || (c.title || '').toLowerCase().includes(searchTerm)
+            );
+
+            conversationList.innerHTML = filtered.map(conv => {
+                const isActive = conv.conversation_id === currentConversationId;
+                const title = conv.title || 'New conversation';
+                const truncatedTitle = title.length > 25 ? title.substring(0, 25) + '...' : title;
+                const date = new Date(conv.conversation_updated_at).toLocaleDateString();
+
+                return `
+                    <div class="group hover:bg-white/10 rounded px-3 py-2 cursor-pointer flex items-center gap-2 transition-colors ${isActive ? 'bg-cyan-600/20 border-l-2 border-cyan-500' : ''}"
+                         data-conv-id="${conv.conversation_id}">
+                        <span>💬</span>
+                        <div class="flex-1 min-w-0" onclick="loadConversation('${conv.conversation_id}')">
+                            <div class="conv-title text-xs truncate" data-full-title="${escapeHtml(title)}">${escapeHtml(truncatedTitle)}</div>
+                            <div class="text-xs opacity-50">${date}</div>
+                        </div>
+                        <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onclick="event.stopPropagation(); startRenameConversation('${conv.conversation_id}', '${escapeHtml(title).replace(/'/g, "\\'")}')" 
+                                    class="text-xs text-cyan-400 hover:text-cyan-300 p-1" title="Rename">
+                                ✏️
+                            </button>
+                            <button onclick="event.stopPropagation(); deleteConversation('${conv.conversation_id}')" 
+                                    class="text-xs text-red-400 hover:text-red-300 p-1" title="Delete">
+                                ✕
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Rename conversation functionality
+        async function startRenameConversation(conversationId, currentTitle) {
+            const convDiv = document.querySelector(`[data-conv-id="${conversationId}"]`);
+            if (!convDiv) return;
+
+            const titleDiv = convDiv.querySelector('.conv-title');
+            if (!titleDiv) return;
+
+            // Replace title with input
+            const originalHtml = titleDiv.innerHTML;
+            titleDiv.innerHTML = `
+                <input type="text" 
+                       class="rename-input w-full bg-black/50 border border-cyan-500/50 rounded px-2 py-0.5 text-xs focus:outline-none focus:border-cyan-400"
+                       value="${currentTitle}"
+                       onclick="event.stopPropagation();"
+                       onkeydown="handleRenameKeydown(event, '${conversationId}')"
+                       onblur="saveRename('${conversationId}', this.value)">
+            `;
+
+            const input = titleDiv.querySelector('.rename-input');
+            input.focus();
+            input.select();
+        }
+
+        function handleRenameKeydown(event, conversationId) {
+            event.stopPropagation();
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                saveRename(conversationId, event.target.value);
+            } else if (event.key === 'Escape') {
+                event.preventDefault();
+                cancelRename();
+            }
+        }
+
+        async function saveRename(conversationId, newTitle) {
+            const trimmedTitle = newTitle.trim();
+            if (!trimmedTitle) {
+                cancelRename();
+                return;
+            }
+
+            try {
+                const response = await fetch(`/conversations/${conversationId}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title: trimmedTitle })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to rename conversation');
+                }
+
+                // Update local data and re-render
+                const updated = await response.json();
+                const convIndex = conversations.findIndex(c => c.conversation_id === conversationId);
+                if (convIndex !== -1) {
+                    conversations[convIndex].title = trimmedTitle;
+                }
+                renderConversationList();
+
+            } catch (error) {
+                console.error('Rename failed:', error);
+                append('system', `❌ Failed to rename: ${error.message}`);
+                renderConversationList(); // Re-render to reset UI
+            }
+        }
+
+        function cancelRename() {
+            renderConversationList();
+        }
+
+        // =============================================================================
+        // EVENT HANDLERS
+        // =============================================================================
+
+        // Send message
+        async function handleSend() {
+            const text = userInput.value.trim();
+            if ((!text && pendingFiles.length === 0) || isLoading) return;
+
+            setLoading(true);
+
+            // 1. If we have pending files, upload them first
+            if (pendingFiles.length > 0) {
+                append('loading', 'Uploading files...');
+                isUploading = true;
+                hideUploadMessages();
+                uploadProgress.classList.remove('hidden');
+
+                try {
+                    for (const file of pendingFiles) {
+                        uploadStatusText.textContent = `Uploading ${file.name}...`;
+                        const result = await uploadFile(file);
+
+                        // Update conversation ID if returned (new conversation created)
+                        if (result.conversation_id && !currentConversationId) {
+                            currentConversationId = result.conversation_id;
+                            await loadConversations();
+                        }
+                    }
+
+                    // Clear pending files after successful upload
+                    pendingFiles = [];
+                    renderPendingFiles();
+
+                    removeLoadingMessage();
+                    append('system', '✅ All files uploaded and indexed.');
+                    updateSystemStatus();
+                } catch (error) {
+                    removeLoadingMessage();
+                    append('system', `❌ Upload failed: ${error.message}`);
+                    setLoading(false);
+                    isUploading = false;
+                    hideUploadMessages();
+                    return; // Stop the flow if upload fails
+                } finally {
+                    isUploading = false;
+                    hideUploadMessages();
+                }
+            }
+
+            if (!text) {
+                setLoading(false);
+                return;
+            }
+
+            append('user', text);
+            userInput.value = '';
+            append('loading');
+
+            try {
+                const data = await sendQuery(text);
+                removeLoadingMessage();
+
+                append('assistant', data.final_response || 'No response provided.', {
+                    shouldAnswer: data.should_answer,
+                    confidence: data.confidence_score ?? data.confidence,
+                    confidenceLevel: data.confidence_level,
+                    factScore: data.fact_score,
+                    relevanceScore: data.relevance_score,
+                    qualityWarnings: data.quality_warnings,
+                    citations: data.citations,
+                    showQualityIndicators: data.show_quality_indicators,
+                    agentType: data.agent_type
+                });
+
+                // Store in history
+                chatHistory.push({ role: 'user', content: text });
+                chatHistory.push({ role: 'assistant', content: data.final_response, data });
+
+                // Refresh conversation list to update title/timestamp
+                if (data.conversation_id && !currentConversationId) {
+                    currentConversationId = data.conversation_id;
+                    await loadConversations();
+                } else if (data.conversation_id) {
+                    await loadConversations();
+                }
+
+            } catch (error) {
+                removeLoadingMessage();
+                append('system', `❌ Error: ${error.message}`);
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        sendBtn.addEventListener('click', handleSend);
+
+        // Clipboard Paste Support for Screenshots
+        userInput.addEventListener('paste', async (e) => {
+            const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+            for (const item of items) {
+                if (item.type.indexOf('image') !== -1) {
+                    const file = item.getAsFile();
+                    if (file) {
+                        const timestamp = new Date().getTime();
+                        const fileName = `screenshot_${timestamp}.png`;
+                        const renamedFile = new File([file], fileName, { type: 'image/png' });
+
+                        pendingFiles.push(renamedFile);
+                        renderPendingFiles();
+                        e.preventDefault();
+                    }
+                }
+            }
+        });
+
+        // Enter key handling
+        userInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSend();
+            }
+        });
+
+        // New chat
+        newChatBtn.addEventListener('click', async () => {
+            chatWindow.innerHTML = '';
+            chatHistory = [];
+            currentConversationId = null;
+
+            // Create new conversation in DB if connected
+            if (dbConnected) {
+                await createNewConversation();
+            }
+
+            append('system', 'New chat started. Upload documents or ask questions about your existing knowledge base.');
+            renderConversationList();
+        });
+
+        // File upload
+        fileInput.addEventListener('change', async (e) => {
+            const files = Array.from(e.target.files);
+            if (files.length === 0) return;
+
+            pendingFiles.push(...files);
+            renderPendingFiles();
+
+            // Clear input so same file can be selected again
+            fileInput.value = '';
+        });
+
+        // Clear all pending files
+        if (clearAttachment) {
+            clearAttachment.addEventListener('click', () => {
+                pendingFiles = [];
+                renderPendingFiles();
+                fileInput.value = '';
+            });
+        }
+
+        // Health check
+        async function updateSystemStatus() {
+            const health = await checkHealth();
+
+            if (health.ready) {
+                statusDot.className = 'w-2 h-2 rounded-full bg-green-500';
+                statusText.textContent = `Ready (${health.chunks_count} chunks)`;
+                fileCount.textContent = health.chunks_count;
+            } else if (health.status === 'ok') {
+                statusDot.className = 'w-2 h-2 rounded-full bg-yellow-500';
+                statusText.textContent = 'No documents indexed';
+                fileCount.textContent = '0';
+            } else {
+                statusDot.className = 'w-2 h-2 rounded-full bg-red-500';
+                statusText.textContent = 'System error';
+                fileCount.textContent = '0';
+            }
+
+            // Update database status
+            dbConnected = health.db_connected || false;
+            if (dbDot && dbText) {
+                if (dbConnected) {
+                    dbDot.className = 'w-2 h-2 rounded-full bg-green-500';
+                    dbText.textContent = 'Database: connected';
+                } else {
+                    dbDot.className = 'w-2 h-2 rounded-full bg-red-500';
+                    dbText.textContent = 'Database: offline';
+                }
+            }
+
+            // Load conversations if DB is connected
+            if (dbConnected && conversations.length === 0) {
+                await loadConversations();
+            }
+        }
+
+        healthCheckBtn.addEventListener('click', async () => {
+            healthCheckBtn.textContent = '🔄 Refreshing...';
+            healthCheckBtn.disabled = true;
+            await updateSystemStatus();
+            healthCheckBtn.textContent = '🔄 Refresh Status';
+            healthCheckBtn.disabled = false;
+        });
+
+        // Search chats filter
+        if (searchChats) {
+            searchChats.addEventListener('input', () => {
+                renderConversationList();
+            });
+        }
+
+        // Profile popup toggle
+        const profileBtn = document.getElementById('profileBtn');
+        const contactPopup = document.getElementById('contactPopup');
+        if (profileBtn && contactPopup) {
+            profileBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                contactPopup.classList.toggle('hidden');
+            });
+            document.addEventListener('click', () => {
+                contactPopup.classList.add('hidden');
+            });
+        }
+
+        // Initial status check
+        updateSystemStatus();
+
+        // Periodic status check every 30 seconds
+        setInterval(updateSystemStatus, 30000);
+    </script>
+</body>
+
+</html>

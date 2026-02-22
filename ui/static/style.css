@@ -1,0 +1,994 @@
+/* 
+7. Implement a "Zen Mode" UI that feels professional and state-of-the-art.
+*/
+:root {
+    --accent: #06b6d4;
+    --accent-glow: rgba(6, 182, 212, 0.4);
+    --bg-deep: #020617;
+    --glass-surface: rgba(8, 10, 24, 0.8);
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --glass-hover: rgba(255, 255, 255, 0.05);
+    --text-primary: #f1f5f9;
+    --text-secondary: #94a3b8;
+    --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+    --sota-glow: 0 0 30px rgba(6, 182, 212, 0.15);
+}
+
+body {
+    background-color: var(--bg-deep);
+    color: var(--text-primary);
+    margin: 0;
+    font-family: 'Inter', 'Outfit', -apple-system, sans-serif;
+    letter-spacing: -0.011em;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+/* Custom Scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+/* UI Components */
+.glass-panel {
+    background: var(--glass-surface);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    border: 1px solid var(--glass-border);
+    transition: background 0.3s var(--ease-smooth), border-color 0.3s var(--ease-smooth);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+.brand-shimmer {
+    background: linear-gradient(90deg, #fff 0%, var(--accent) 50%, #fff 100%);
+    background-size: 200% auto;
+    color: transparent;
+    -webkit-background-clip: text;
+    background-clip: text;
+    animation: shimmer 4s linear infinite;
+}
+
+@keyframes shimmer {
+    to {
+        background-position: 200% center;
+    }
+}
+
+/* Premium Task Cards (Generative UI) */
+.task-card {
+    background: rgba(30, 41, 59, 0.4);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 20px;
+    margin: 24px 0;
+    overflow: hidden;
+    opacity: 0;
+    transform: translateY(20px);
+    animation: cardEnter 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.5);
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes cardEnter {
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.task-card:hover {
+    transform: translateY(-4px) scale(1.01);
+    box-shadow: 0 20px 50px -10px rgba(0, 0, 0, 0.7);
+    border-color: rgba(255, 255, 255, 0.15);
+    background: rgba(30, 41, 59, 0.5);
+}
+
+.card-header {
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(255, 255, 255, 0.03);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.card-title-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.card-title {
+    font-size: 0.75rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+}
+
+.card-body {
+    padding: 20px;
+    font-size: 0.875rem;
+    line-height: 1.6;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+/* Variant Decorations */
+.task-translation {
+    border-top: 4px solid #3b82f6;
+}
+
+.task-translation .card-title {
+    color: #60a5fa;
+}
+
+.task-summary {
+    border-top: 4px solid #10b981;
+}
+
+.task-summary .card-title {
+    color: #34d399;
+}
+
+.task-rewrite {
+    border-top: 4px solid #8b5cf6;
+}
+
+.task-rewrite .card-title {
+    color: #a78bfa;
+}
+
+.task-default {
+    border-top: 4px solid #64748b;
+}
+
+/* SOTA Phase 13: Content-Adaptive Rendering Styles */
+
+/* 1. Elite Code Blocks */
+.code-block-sota {
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    margin: 20px 0;
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.code-header {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 8px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.code-lang-badge {
+    font-size: 0.65rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    color: var(--accent);
+    letter-spacing: 0.1em;
+}
+
+.code-copy-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.code-copy-btn:hover {
+    color: #fff;
+}
+
+.code-block-sota pre {
+    padding: 20px;
+    margin: 0 !important;
+    overflow-x: auto;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 0.85rem;
+    line-height: 1.6;
+}
+
+/* 2. Insight Cards (Contextual Callouts) */
+.insight-card {
+    background: linear-gradient(135deg, rgba(6, 182, 212, 0.1) 0%, rgba(30, 41, 59, 0.4) 100%);
+    border-left: 4px solid var(--accent);
+    padding: 20px 24px;
+    border-radius: 12px;
+    margin: 24px 0;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+}
+
+.insight-card .insight-label {
+    font-size: 0.7rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--accent);
+    margin-bottom: 8px;
+    display: block;
+}
+
+/* 3. Premium Table Styling */
+.ai-bubble table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    margin: 20px 0;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.ai-bubble th {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 12px 16px;
+    text-align: left;
+    font-size: 0.8rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-secondary);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.ai-bubble td {
+    padding: 14px 16px;
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    transition: background 0.2s;
+}
+
+.ai-bubble tr:last-child td {
+    border-bottom: none;
+}
+
+.ai-bubble tr:hover td {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+/* 4. Action Injectors */
+.action-injector-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.action-btn {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 8px 14px;
+    border-radius: 100px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.3s var(--ease-smooth);
+    cursor: pointer;
+}
+
+.action-btn:hover {
+    background: rgba(6, 182, 212, 0.1);
+    border-color: rgba(6, 182, 212, 0.3);
+    color: var(--accent);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+/* SOTA: Grounded RAG UI - Cinematic Narrative Layout */
+.grounded-card {
+    background: linear-gradient(165deg, rgba(8, 10, 24, 0.95) 0%, rgba(15, 23, 42, 0.98) 100%);
+    backdrop-filter: blur(48px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 36px;
+    margin: 28px 0;
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 40px 100px -20px rgba(0, 0, 0, 0.9);
+    animation: cardEnter 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Cinematic Background Effect */
+.grounded-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 50% 50%, rgba(6, 182, 212, 0.05) 0%, transparent 70%);
+    opacity: 0.4;
+    z-index: 0;
+    pointer-events: none;
+    animation: cognitivePulse 8s ease-in-out infinite alternate;
+}
+
+@keyframes cognitivePulse {
+    0% {
+        transform: scale(1) translate(0, 0);
+        opacity: 0.3;
+    }
+
+    100% {
+        transform: scale(1.2) translate(5%, 5%);
+        opacity: 0.6;
+    }
+}
+
+.source-strip {
+    padding: 12px 24px;
+    background: rgba(255, 255, 255, 0.02);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+
+.source-strip-label {
+    font-size: 0.6rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: var(--accent);
+    margin-right: 8px;
+    opacity: 0.7;
+}
+
+.source-pill {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 4px 10px;
+    border-radius: 8px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.6);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s var(--ease-smooth);
+    cursor: pointer;
+}
+
+.source-pill:hover {
+    background: rgba(6, 182, 212, 0.1);
+    color: var(--accent);
+    border-color: rgba(6, 182, 212, 0.3);
+    transform: translateY(-1px);
+}
+
+.grounded-body {
+    padding: 24px 32px;
+    font-size: 0.875rem;
+    line-height: 1.6;
+    color: #f1f5f9;
+    z-index: 1;
+    position: relative;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.grounded-body p {
+    margin-bottom: 1.25rem;
+}
+
+.grounded-body p:last-child {
+    margin-bottom: 0;
+}
+
+/* Lens Highlight - Inline Vision Annotations */
+.lens-highlight {
+    position: relative;
+    cursor: help;
+    color: var(--accent);
+    font-weight: 600;
+    background: linear-gradient(to bottom, transparent 70%, rgba(6, 182, 212, 0.15) 70%);
+    padding: 0 2px;
+    border-radius: 2px;
+    transition: all 0.3s var(--ease-smooth);
+}
+
+.lens-highlight:hover {
+    color: #fff;
+    background: var(--accent);
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+    box-shadow: 0 0 20px var(--accent-glow);
+}
+
+/* Zen-Mode Source Badges */
+.source-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 100px;
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.4);
+    vertical-align: middle;
+    margin-left: 4px;
+    transition: all 0.3s var(--ease-smooth);
+    user-select: none;
+}
+
+.source-badge:hover {
+    background: rgba(6, 182, 212, 0.1);
+    color: var(--accent);
+    border-color: rgba(6, 182, 212, 0.3);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.source-badge i {
+    font-size: 0.55rem;
+    opacity: 0.7;
+}
+
+/* Perception Tooltip */
+.perception-tooltip {
+    position: absolute;
+    bottom: calc(100% + 12px);
+    left: 50%;
+    transform: translateX(-50%) translateY(10px);
+    width: 280px;
+    background: rgba(15, 23, 42, 0.95);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(6, 182, 212, 0.4);
+    padding: 16px;
+    border-radius: 16px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+    opacity: 0;
+    visibility: hidden;
+    display: none;
+    /* SOTA Fix: Prevent layout leak */
+    pointer-events: none;
+    z-index: 100;
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #e2e8f0;
+    line-height: 1.6;
+}
+
+.lens-highlight:hover .perception-tooltip {
+    opacity: 1;
+    visibility: visible;
+    display: block;
+    /* SOTA Fix: Show on hover */
+    transform: translateX(-50%) translateY(0);
+}
+
+.perception-tooltip-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    font-size: 0.6rem;
+    font-weight: 900;
+    letter-spacing: 0.15em;
+    color: var(--accent);
+    text-transform: uppercase;
+}
+
+.perception-tooltip-body {
+    display: block;
+    font-size: 0.85rem;
+    color: #e2e8f0;
+    line-height: 1.6;
+}
+
+.copy-btn {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 5px 10px;
+    border-radius: 8px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.5);
+    transition: all 0.2s;
+}
+
+.copy-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.task-icon {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    font-size: 0.9rem;
+}
+
+/* Animations */
+@keyframes slide-down {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.animate-slide-down {
+    animation: slide-down 0.4s var(--ease-smooth);
+}
+
+@keyframes slide-up-fade {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.animate-slide-up {
+    animation: slide-up-fade 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* SOTA Thought Process UI */
+.thought-process-container summary::-webkit-details-marker {
+    display: none;
+}
+
+.thought-process-container summary {
+    list-style: none;
+    /* Hide default arrow */
+}
+
+.pulse-icon {
+    animation: pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse-glow {
+
+    0%,
+    100% {
+        opacity: 1;
+        text-shadow: 0 0 10px rgba(6, 182, 212, 0.5);
+    }
+
+    50% {
+        opacity: 0.5;
+        text-shadow: none;
+    }
+}
+
+/* Bubble Styling */
+.bubble {
+    padding: 0;
+    line-height: 1.6;
+    font-size: 0.875rem;
+    letter-spacing: -0.01em;
+}
+
+.user-node {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.ai-node {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.user-bubble {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    color: #f8fafc;
+    max-width: 85%;
+    backdrop-filter: blur(8px);
+    padding: 12px 18px;
+    border-radius: 20px 20px 4px 20px;
+}
+
+.ai-bubble {
+    background: transparent;
+    padding: 0;
+    color: #cbd5e1;
+}
+
+/* Thinking Indicator */
+.thinking-bubble {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 20px;
+    background: rgba(15, 23, 42, 0.4);
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    margin-bottom: 20px;
+    width: fit-content;
+    animation: slide-down 0.3s var(--ease-smooth);
+}
+
+.typing-dots {
+    display: flex;
+    gap: 4px;
+}
+
+.typing-dot {
+    width: 6px;
+    height: 6px;
+    background: var(--accent);
+    border-radius: 50%;
+    animation: jump 1.4s infinite ease-in-out;
+}
+
+.typing-dot:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+.typing-dot:nth-child(3) {
+    animation-delay: 0.4s;
+}
+
+@keyframes jump {
+
+    0%,
+    80%,
+    100% {
+        transform: translateY(0);
+    }
+
+    40% {
+        transform: translateY(-8px);
+    }
+}
+
+/* Adaptive Resonance Metadata */
+.resonance-card {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 12px 20px;
+    background: rgba(15, 23, 42, 0.4);
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    margin-bottom: 20px;
+}
+
+.intent-pill {
+    background: var(--accent);
+    color: #000;
+    padding: 3px 10px;
+    border-radius: 6px;
+    font-size: 0.7rem;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+/* Sidebar Customizations */
+.tree-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s var(--ease-smooth);
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.tree-item:hover {
+    background: var(--glass-hover);
+    color: var(--text-primary);
+}
+
+.tree-item.active {
+    background: rgba(6, 182, 212, 0.1);
+    color: var(--accent);
+    border: 1px solid rgba(6, 182, 212, 0.2);
+}
+
+.conv-actions {
+    display: none;
+}
+
+.tree-item.group:hover .conv-actions {
+    display: flex;
+}
+
+/* SOTA: Telemetry HUD Animations */
+#telemetryHud {
+    filter: drop-shadow(0 0 20px rgba(6, 182, 212, 0.15));
+}
+
+#telemetryHud .glass-panel {
+    border-left: 3px solid var(--accent);
+}
+
+/* SOTA: Source Explorer */
+#sourceExplorer {
+    z-index: 80;
+    /* Above footer's 60 and pdf menu's 70 */
+}
+
+.source-highlight {
+    background: rgba(16, 185, 129, 0.1);
+    border-bottom: 2px solid rgba(16, 185, 129, 0.4);
+    padding: 0 2px;
+}
+
+/* Token Streaming Animation */
+.ai-bubble {
+    transition: opacity 0.3s var(--ease-smooth);
+}
+
+.token-stream-active::after {
+    content: '|';
+    animation: blink 1s infinite;
+    color: var(--accent);
+    margin-left: 2px;
+}
+
+@keyframes blink {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0;
+    }
+}
+
+/* Glassmorphism Enhancements */
+.glass-panel::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.05) 0%, transparent 70%);
+    opacity: 0.5;
+}
+
+/* Workspace File Viewer */
+.workspace-file-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s var(--ease-smooth);
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.workspace-file-item:hover {
+    background: rgba(6, 182, 212, 0.08);
+    color: var(--text-primary);
+}
+
+.workspace-file-item .file-icon {
+    width: 22px;
+    height: 22px;
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.6rem;
+    flex-shrink: 0;
+}
+
+.workspace-file-item .file-icon.doc {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+}
+
+.workspace-file-item .file-icon.img {
+    background: rgba(16, 185, 129, 0.15);
+    color: #10b981;
+}
+
+.workspace-file-item .file-icon.vid {
+    background: rgba(139, 92, 246, 0.15);
+    color: #8b5cf6;
+}
+
+.workspace-file-item .file-icon.aud {
+    background: rgba(245, 158, 11, 0.15);
+    color: #f59e0b;
+}
+
+.workspace-file-item .file-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 500;
+}
+
+.workspace-file-item .file-type-badge {
+    font-size: 0.55rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.35);
+    flex-shrink: 0;
+}
+
+/* Stop Generation Button */
+.stop-btn-pulse {
+    animation: stop-pulse 1.5s ease-in-out infinite;
+    box-shadow: 0 0 15px rgba(239, 68, 68, 0.3);
+}
+
+@keyframes stop-pulse {
+
+    0%,
+    100% {
+        box-shadow: 0 0 10px rgba(239, 68, 68, 0.3);
+    }
+
+    50% {
+        box-shadow: 0 0 25px rgba(239, 68, 68, 0.6), 0 0 50px rgba(239, 68, 68, 0.2);
+    }
+}
+
+/* Visibility Toggling Logic (Bulletproof) */
+#actionButtonContainer[data-state="processing"] #sendBtn {
+    display: none !important;
+}
+
+#actionButtonContainer[data-state="processing"] #stopBtn {
+    display: flex !important;
+}
+
+#actionButtonContainer[data-state="idle"] #sendBtn {
+    display: flex !important;
+}
+
+#actionButtonContainer[data-state="idle"] #stopBtn {
+    display: none !important;
+}
+
+/* Terminated Response Badge */
+.intent-pill.terminated {
+    background: #ef4444;
+    color: #fff;
+}
+
+/* SOTA Tooltip Body Styling */
+.perception-tooltip-body {
+    font-size: 0.82rem;
+    line-height: 1.6;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.perception-tooltip-body p {
+    margin-bottom: 6px;
+}
+
+.perception-tooltip-body p:last-child {
+    margin-bottom: 0;
+}
+
+.content-body p {
+    margin-bottom: 1.2rem;
+}
+
+.content-body p:last-child {
+    margin-bottom: 0;
+}
+
+/* ═══════════════════════════════════════════════════
+   SOTA: Summary Cascade UI — Per-File Response Block
+   ═══════════════════════════════════════════════════ */
+.summary-cascade-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 18px;
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.12) 0%, rgba(139, 92, 246, 0.08) 100%);
+    border: 1px solid rgba(99, 102, 241, 0.25);
+    border-radius: 12px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: #a5b4fc;
+    margin-bottom: 8px;
+    animation: cascade-enter 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    backdrop-filter: blur(8px);
+    box-shadow: 0 4px 20px rgba(99, 102, 241, 0.1);
+}
+
+@keyframes cascade-enter {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ═══════════════════════════════════════════════════
+   Web Search Toggle Button
+   ═══════════════════════════════════════════════════ */
+.web-toggle-btn {
+    position: relative;
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.web-toggle-btn i {
+    transition: color 0.3s ease, opacity 0.3s ease;
+}
+
+/* Active state — glowing cyan */
+.web-toggle-btn.web-toggle-active {
+    background: rgba(6, 182, 212, 0.15) !important;
+    border-color: rgba(6, 182, 212, 0.4) !important;
+    box-shadow: 0 0 20px rgba(6, 182, 212, 0.25), inset 0 0 12px rgba(6, 182, 212, 0.1);
+}
+
+.web-toggle-btn.web-toggle-active i {
+    color: #06b6d4;
+    opacity: 1 !important;
+}
+
+/* Pulse animation when active */
+@keyframes web-toggle-pulse {
+
+    0%,
+    100% {
+        box-shadow: 0 0 15px rgba(6, 182, 212, 0.25);
+    }
+
+    50% {
+        box-shadow: 0 0 30px rgba(6, 182, 212, 0.5), 0 0 60px rgba(6, 182, 212, 0.15);
+    }
+}
+
+.web-toggle-btn.web-toggle-active {
+    animation: web-toggle-pulse 2.5s ease-in-out infinite;
+}
