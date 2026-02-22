@@ -4,6 +4,7 @@ Handles Qwen2-VL-2B inference via HuggingFace Transformers.
 Optimized for 6GB VRAM using 4-bit quantization and CPU offloading.
 """
 
+import os
 import torch
 from typing import List, Dict, Optional
 from PIL import Image
@@ -18,11 +19,38 @@ class QwenVisionAgent:
         self.processor = None
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
+    def _check_gpu_health(self):
+        """Forensic GPU diagnostic for SentinelRAG Elite."""
+        logger.info("🕵️ GPU Diagnostic: Running health check...")
+        try:
+            torch_ver = torch.__version__
+            cuda_avail = torch.cuda.is_available()
+            logger.info(f"  - PyTorch Version: {torch_ver}")
+            logger.info(f"  - CUDA Available: {cuda_avail}")
+            
+            if cuda_avail:
+                logger.info(f"  - Device Count: {torch.cuda.device_count()}")
+                logger.info(f"  - Device Name: {torch.cuda.get_device_name(0)}")
+                logger.info(f"  - CUDA Version: {torch.version.cuda}")
+                # Log VRAM status
+                vram_free, vram_total = torch.cuda.mem_get_info()
+                logger.info(f"  - VRAM: {vram_free/1024**3:.1f}GB free / {vram_total/1024**3:.1f}GB total")
+            else:
+                logger.warning("  - [CAUTION] CUDA not detected by PyTorch.")
+                # Look for common issues: environment variables
+                vis_dev = os.environ.get("CUDA_VISIBLE_DEVICES")
+                if vis_dev:
+                    logger.warning(f"  - CUDA_VISIBLE_DEVICES is set to: {vis_dev}")
+        except Exception as e:
+            logger.error(f"  - GPU Diagnostic failed: {e}")
+
     def _lazy_load(self):
         """Load model with adaptive configuration (4-bit for GPU, standard for CPU)."""
         if self.model is not None:
             return
 
+        self._check_gpu_health()
+        
         logger.info(f"Loading Qwen2-VL-2B from HuggingFace ({self.model_id})...")
         try:
             import transformers
@@ -40,7 +68,11 @@ class QwenVisionAgent:
                 "low_cpu_mem_usage": True,
             }
 
-            if torch.cuda.is_available():
+            # Check if user wants to force GPU (can be useful if basic check fails but path exists)
+            force_gpu = os.getenv("SENTINEL_FORCE_GPU", "false").lower() == "true"
+            use_cuda = torch.cuda.is_available() or force_gpu
+
+            if use_cuda:
                 from transformers import BitsAndBytesConfig
                 # 4-bit quantization config for 6GB VRAM
                 bnb_config = BitsAndBytesConfig(
@@ -51,16 +83,38 @@ class QwenVisionAgent:
                 )
                 kwargs["quantization_config"] = bnb_config
                 kwargs["device_map"] = "auto"
-                kwargs["max_memory"] = {0: "4GiB", "cpu": "24GiB"}
-                logger.info("GPU detected: Enabling 4-bit quantization and auto device mapping.")
+                # Dynamic max memory based on actual VRAM
+                try:
+                    vram_free, _ = torch.cuda.mem_get_info()
+                    # Leave 1.5GB for system/overhead, cap model at remaining
+                    safe_vram = f"{max(2.0, (vram_free/1024**3) - 1.5):.1f}GiB"
+                    kwargs["max_memory"] = {0: safe_vram, "cpu": "24GiB"}
+                except:
+                    kwargs["max_memory"] = {0: "4GiB", "cpu": "24GiB"}
+                
+                logger.info(f"GPU Mode Enabled: Using 4-bit quantization (Cap: {kwargs.get('max_memory', {}).get(0, '4GiB')}).")
+                self.device = "cuda"
             else:
-                # CPU fallback: No quantization (bitsandbytes doesn't support CPU), use float32 or bfloat16
+                # CPU fallback: No quantization (bitsandbytes doesn't support CPU)
                 kwargs["device_map"] = "cpu"
-                kwargs["torch_dtype"] = torch.float32 # Safest for CPU, can use bfloat16 if memory is tight
-                logger.info("No GPU detected: Falling back to CPU mode (Float32).")
+                kwargs["torch_dtype"] = torch.float32 
+                logger.info("CPU Mode Enabled: Falling back to Float32 (No GPU).")
+                self.device = "cpu"
 
             self.model = Qwen2VLForConditionalGeneration.from_pretrained(**kwargs)
-            logger.info(f"Qwen2-VL-2B loaded successfully on {self.device}.")
+            
+            # Final device verification
+            actual_device = next(self.model.parameters()).device
+            logger.info(f"Qwen2-VL-2B loaded successfully on {actual_device}.")
+            self.device = str(actual_device)
+        except ImportError as e:
+            logger.error(f"Missing dependency for Qwen2-VL: {e}. Please run 'pip install qwen-vl-utils accelerate bitsandbytes'")
+            raise
+        except Exception as e:
+            logger.error(f"Failed to load Qwen2-VL model ({self.model_id}): {e}")
+            if "accelerator device" in str(e).lower():
+                logger.error("HINT: This usually happens when bitsandbytes quantization is attempted on a CPU-only machine.")
+            raise
         except ImportError as e:
             logger.error(f"Missing dependency for Qwen2-VL: {e}. Please run 'pip install qwen-vl-utils accelerate bitsandbytes'")
             raise

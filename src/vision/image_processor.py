@@ -41,11 +41,20 @@ class ImageProcessor:
                 import easyocr
                 logger.info("Initializing EasyOCR reader...")
                 # Enable GPU acceleration only if CUDA is available
-                cuda_available = torch.cuda.is_available()
+                # Logic: We use the same 'Force GPU' logic if set in environment
+                force_gpu = os.getenv("SENTINEL_FORCE_GPU", "false").lower() == "true"
+                cuda_available = torch.cuda.is_available() or force_gpu
+                
+                if not torch.cuda.is_available() and force_gpu:
+                    logger.warning("EasyOCR: SENTINEL_FORCE_GPU is ON. Attempting GPU loading despite CUDA reporting False.")
+                
                 self.ocr_reader = easyocr.Reader(['en'], gpu=cuda_available)
                 logger.info(f"EasyOCR reader initialized (GPU={cuda_available})")
             except ImportError:
                 logger.warning("easyocr not installed. OCR stage will be skipped.")
+                return None
+            except Exception as e:
+                logger.error(f"Failed to initialize EasyOCR: {e}")
                 return None
         return self.ocr_reader
 
