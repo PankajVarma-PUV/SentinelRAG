@@ -42,16 +42,21 @@ UltimaRAG is designed to be run **locally** to ensure complete data privacy and 
 
 UltimaRAG features a **Smart setup script** that automatically detects your hardware (NVIDIA GPU vs CPU) and installs the correct ML stack for you.
 
+#### Method 1: One-Click Installation (Recommended)
+Simply download and run the **`clone_UltimaRAG.bat`** file. This script will automatically clone the repository, set up the environment, and launch the application for you.
+
+#### Method 2: Manual Installation
 1.  **Clone the repository**:
     ```bash
-    git clone https://github.com/your-username/UltimaRAG.git
+    git clone https://github.com/PankajVarma-PUV/UltimaRAG.git
     cd UltimaRAG
     ```
 2.  **Start the Application**:
     Simply run the automated startup script. It will create a virtual environment, install the correct version of Torch for your hardware, and launch the server:
     ```bash
-    run_UltimaRAG.bat
+    Run_UltimaRAG.bat
     ```
+
 The API server will start at `http://localhost:8000`, and the UI will be accessible in your web browser.
 
 ## 📁 Project Structure
