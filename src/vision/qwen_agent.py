@@ -15,7 +15,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-Vision Perception Agent for Ultima_RAG.
+Vision Perception Agent for UltimaRAG.
 Handles Qwen2-VL-2B inference via HuggingFace Transformers.
 Optimized for 6GB VRAM using 4-bit quantization and CPU offloading.
 """
@@ -36,7 +36,7 @@ class QwenVisionAgent:
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
     def _check_gpu_health(self):
-        """Forensic GPU diagnostic for Ultima_RAG Elite."""
+        """Forensic GPU diagnostic for UltimaRAG Elite."""
         logger.info("🕵️ GPU Diagnostic: Running health check...")
         try:
             torch_ver = torch.__version__

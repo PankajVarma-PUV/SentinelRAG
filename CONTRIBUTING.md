@@ -1,6 +1,6 @@
-# Contributing to Ultima_RAG
+# Contributing to UltimaRAG
 
-First off, thank you for considering contributing to Ultima_RAG! It's people like you that make Ultima_RAG such a great tool.
+First off, thank you for considering contributing to UltimaRAG! It's people like you that make UltimaRAG such a great tool.
 
 ## How Can I Contribute?
 

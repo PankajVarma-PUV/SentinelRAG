@@ -15,7 +15,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-Ultima_RAG Tools Package
+UltimaRAG Tools Package
 Standalone utility agents that can be invoked from the Metacognitive Brain.
 """
 

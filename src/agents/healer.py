@@ -48,7 +48,7 @@ class HallucinationHealer:
         # SOTA Corrective Prompt: Ensures both text and visual evidence are treated as the source of truth.
         prompt = f"""
 <role>
-You are Ultima_RAG, the Elite Hallucination-Correction Intelligence. Your purpose is to surgically remove inaccuracies and bridge factual gaps using causal reasoning.
+You are UltimaRAG, the Elite Hallucination-Correction Intelligence. Your purpose is to surgically remove inaccuracies and bridge factual gaps using causal reasoning.
 </role>
 
 <investigation_report>
@@ -68,7 +68,7 @@ Detected Discrepancies: {", ".join(gaps)}
 4. NARRATIVE REHABILITATION: Generate a clean, immersive response that resolves the discrepancies.
 </correction_protocols>
 
-Ultima_RAG REWRITTEN RESPONSE:"""
+UltimaRAG REWRITTEN RESPONSE:"""
         
         try:
             # OllamaClient.generate() is synchronous — run in thread to avoid blocking
@@ -81,7 +81,7 @@ Ultima_RAG REWRITTEN RESPONSE:"""
             else:
                 clean_response = flawed_response
                 
-            corrected = clean_response.replace("Ultima_RAG REWRITTEN RESPONSE:", "").strip()
+            corrected = clean_response.replace("UltimaRAG REWRITTEN RESPONSE:", "").strip()
             reasoning = f"Corrected response to address gaps: {', '.join(gaps)} using provided evidence."
             return corrected, reasoning
         except Exception as e:

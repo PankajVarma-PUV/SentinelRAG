@@ -22,7 +22,7 @@ from .utils import logger
 from .file_manager import ensure_chat_dir
 
 class DocumentProcessor:
-    """SOTA Document Processor for Ultima_RAG. Extracts text and images from PDFs."""
+    """SOTA Document Processor for UltimaRAG. Extracts text and images from PDFs."""
     
     @staticmethod
     def extract_from_pdf(conversation_id: str, file_path: str, file_name: str) -> Tuple[str, List[str]]:

@@ -115,7 +115,7 @@ class UltimaApp {
 
         // Auto-refresh status
         setInterval(() => this.updateSystemStatus(), 30000);
-        console.log("Ultima_RAG Metacognitive Core Interface Active.");
+        console.log("UltimaRAG Metacognitive Core Interface Active.");
     }
 
     setupEventListeners() {
@@ -300,7 +300,7 @@ class UltimaApp {
         this.chatLog.innerHTML = `
             <div class="max-w-3xl mx-auto bg-white/5 p-6 rounded-3xl border border-white/5 shadow-xl">
                 <div class="text-sm leading-relaxed">
-                    Welcome to <strong class="text-cyan-400">Ultima_RAG</strong>. I am your metacognitive assistant.
+                    Welcome to <strong class="text-cyan-400">UltimaRAG</strong>. I am your metacognitive assistant.
                     Upload documents or ask questions to begin reasoning with grounded evidence.
                 </div>
                 <div class="text-[10px] font-bold uppercase tracking-widest text-cyan-500/50 mt-4 flex items-center gap-2">
@@ -530,7 +530,7 @@ class UltimaApp {
             btn.classList.remove('web-toggle-active');
             btn.title = 'Web Search: OFF — enable to search the web as a fallback';
         }
-        console.log(`[Ultima_RAG] Web Search toggle: ${this.state.webSearchEnabled ? 'ON' : 'OFF'}`);
+        console.log(`[UltimaRAG] Web Search toggle: ${this.state.webSearchEnabled ? 'ON' : 'OFF'}`);
     }
 
     // --- Message Rendering ---
@@ -1982,7 +1982,7 @@ class UltimaApp {
             a.href = url;
             const cd = resp.headers.get('Content-Disposition');
             const match = cd ? cd.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/) : null;
-            a.download = match ? match[1].replace(/['"]/g, '') : 'Ultima_RAG_Conversation.pdf';
+            a.download = match ? match[1].replace(/['"]/g, '') : 'UltimaRAG_Conversation.pdf';
             document.body.appendChild(a);
             a.click();
             a.remove();
@@ -2072,7 +2072,7 @@ class UltimaApp {
             a.href = url;
             const cd = resp.headers.get('Content-Disposition');
             const match = cd ? cd.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/) : null;
-            a.download = match ? match[1].replace(/['"]/g, '') : 'Ultima_RAG_QueryExport.pdf';
+            a.download = match ? match[1].replace(/['"]/g, '') : 'UltimaRAG_QueryExport.pdf';
             document.body.appendChild(a);
             a.click();
             a.remove();

@@ -15,7 +15,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-Manager for Multimodal processing in Ultima_RAG.
+Manager for Multimodal processing in UltimaRAG.
 Orchestrates between Image, Audio, and Video pipelines.
 """
 

@@ -15,7 +15,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-Vision and Multimodal processing module for Ultima_RAG.
+Vision and Multimodal processing module for UltimaRAG.
 Handles Image, Audio, and Video scraping.
 """
 

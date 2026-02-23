@@ -40,7 +40,7 @@ from ..core.utils import logger, set_seed
 from ..data.chunking import DocumentChunker
 from ..data.embedder import get_embedder, embed_chunks
 from ..data.database import DatabaseManager, get_database as get_relational_db, init_database
-from ..core.database import Ultima_RAGDatabase, get_database as get_vector_db
+from ..core.database import UltimaRAGDatabase, get_database as get_vector_db
 from ..core.memory import MemoryManager
 from ..agents.metacognitive_brain import MetacognitiveBrain
 from ..vision.manager import MultimodalManager
@@ -174,9 +174,9 @@ class ConversationWithMessages(BaseModel):
 # =============================================================================
 
 class AppState:
-    """Application state container (Ultima_RAG Edition)"""
+    """Application state container (UltimaRAG Edition)"""
     brain: Optional[Any] = None # MetacognitiveBrain
-    db: Optional[Any] = None # Ultima_RAGDatabase
+    db: Optional[Any] = None # UltimaRAGDatabase
     sqlite_db: Optional[Any] = None # DatabaseManager
     memory: Optional[Any] = None # MemoryManager
     ready: bool = False
@@ -199,7 +199,7 @@ abort_flags: dict = {}
 async def lifespan(app: FastAPI):
     """Application lifespan manager for startup/shutdown"""
     # Startup
-    logger.info("🚀 Starting Ultima_RAG API...")
+    logger.info("🚀 Starting UltimaRAG API...")
     set_seed(Config.deterministic.RANDOM_SEED)
     Config.validate_context_budget()
     
@@ -215,19 +215,19 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"❌ Database Initialization Error: {e}")
     
-    # 2. Initialize Ultima_RAG Metacognitive Core
+    # 2. Initialize UltimaRAG Metacognitive Core
     try:
-        logger.info("[2/3] Initializing Ultima_RAG Metacognitive Brain...")
-        app_state.db = Ultima_RAGDatabase()
+        logger.info("[2/3] Initializing UltimaRAG Metacognitive Brain...")
+        app_state.db = UltimaRAGDatabase()
         app_state.memory = MemoryManager(app_state.db)
         # Pass sqlite_db so the brain can query scraped_content (lives in SQLite, not LanceDB)
         app_state.brain = MetacognitiveBrain(
             app_state.db, app_state.memory,
             sqlite_db=app_state.sqlite_db if hasattr(app_state, 'sqlite_db') and app_state.sqlite_db else None
         )
-        logger.info("✅ Ultima_RAG Brain initialized.")
+        logger.info("✅ UltimaRAG Brain initialized.")
     except Exception as e:
-        logger.error(f"❌ Failed to initialize Ultima_RAG Brain: {e}")
+        logger.error(f"❌ Failed to initialize UltimaRAG Brain: {e}")
         import traceback
         logger.error(traceback.format_exc())
         app_state.ready = False
@@ -235,7 +235,7 @@ async def lifespan(app: FastAPI):
         
     # 3. Final Readiness and Warming
     try:
-        logger.info("[3/3] Finalizing Ultima_RAG SOTA Stack...")
+        logger.info("[3/3] Finalizing UltimaRAG SOTA Stack...")
         # Pre-warm Vision/OCR Models to eliminate cold-start latency
         try:
             from ..vision.manager import MultimodalManager
@@ -245,7 +245,7 @@ async def lifespan(app: FastAPI):
             logger.error(f"⚠️ Model warming failed (non-fatal): {e}")
 
         app_state.ready = True
-        logger.info("🧠 Ultima_RAG SOTA Stack Fully Ready.")
+        logger.info("🧠 UltimaRAG SOTA Stack Fully Ready.")
     except Exception as e:
         logger.error(f"❌ Initialization failure: {e}")
         # Not fatal for the Brain, but some endpoints will fail
@@ -253,7 +253,7 @@ async def lifespan(app: FastAPI):
     yield
     
     # Shutdown
-    logger.info("Shutting down Ultima_RAG API...")
+    logger.info("Shutting down UltimaRAG API...")
     if app_state.db:
         app_state.db.disconnect()
 
@@ -263,7 +263,7 @@ async def lifespan(app: FastAPI):
 # =============================================================================
 
 app = FastAPI(
-    title="Ultima_RAG API",
+    title="UltimaRAG API",
     description="Multi-Agent RAG System with hallucination prevention",
     version="1.0.0",
     lifespan=lifespan
@@ -298,7 +298,7 @@ async def home(request: Request):
     """Serve the main UI"""
     if templates:
         return templates.TemplateResponse("index.html", {"request": request})
-    return HTMLResponse("<h1>Ultima_RAG API</h1><p>UI not found. Use /docs for API documentation.</p>")
+    return HTMLResponse("<h1>UltimaRAG API</h1><p>UI not found. Use /docs for API documentation.</p>")
 
 
 @app.get("/favicon.ico", include_in_schema=False)
@@ -332,11 +332,11 @@ async def health_check(conversation_id: Optional[str] = None):
 @app.post("/query", response_model=QueryResponse)
 async def process_query(request: QueryRequest):
     """
-    Ultima_RAG Metacognitive Entry Point.
+    UltimaRAG Metacognitive Entry Point.
     Routes all queries through the LangGraph reasoning loop.
     """
     if not app_state.brain:
-        raise HTTPException(status_code=503, detail="Ultima_RAG Brain not initialized")
+        raise HTTPException(status_code=503, detail="UltimaRAG Brain not initialized")
     
     try:
         # Parse @mentions from query text
@@ -387,7 +387,7 @@ async def process_query(request: QueryRequest):
             success=False,
             query=request.query,
             should_answer=False,
-            final_response=f"Ultima_RAG Brain encountered an internal error: {str(e)}",
+            final_response=f"UltimaRAG Brain encountered an internal error: {str(e)}",
             conversation_id=request.conversation_id
         )
 
@@ -770,7 +770,7 @@ async def unified_query(
     # Parse form string to bool
     _use_web_search = str(use_web_search).lower() == "true"
     if not app_state.brain:
-        error_detail = app_state.startup_error or "Ultima_RAG Brain not initialized. Please check server logs."
+        error_detail = app_state.startup_error or "UltimaRAG Brain not initialized. Please check server logs."
         raise HTTPException(status_code=503, detail=error_detail)
     
     async def unified_generator():
@@ -1507,7 +1507,7 @@ async def pdf_query_generate(
     """
     import uuid, json as _json
     if not app_state.brain:
-        raise HTTPException(status_code=503, detail="Ultima_RAG Brain not initialized.")
+        raise HTTPException(status_code=503, detail="UltimaRAG Brain not initialized.")
 
     # Parse mentioned files
     files_list: List[str] = []
@@ -1591,7 +1591,7 @@ async def pdf_query_generate(
     session_token = str(uuid.uuid4())
     db = get_relational_db()
     conv = db.get_conversation(conversation_id) if db else {}
-    conv_title = (conv or {}).get("title") or (conv or {}).get("name") or "Ultima_RAG Export"
+    conv_title = (conv or {}).get("title") or (conv or {}).get("name") or "UltimaRAG Export"
 
     _pdf_sessions[session_token] = {
         "query": query,
@@ -1625,10 +1625,10 @@ async def pdf_download(session_token: str):
             response=session["response"],
             conversation_id=session["conversation_id"],
             mentioned_files=session.get("mentioned_files"),
-            conversation_title=session.get("title", "Ultima_RAG Export"),
+            conversation_title=session.get("title", "UltimaRAG Export"),
         )
         safe_title = "".join(c if c.isalnum() or c in (' ', '-', '_') else '_' for c in session.get("title", "Export"))[:40]
-        filename = f"Ultima_RAG_QueryExport_{safe_title}.pdf"
+        filename = f"UltimaRAG_QueryExport_{safe_title}.pdf"
 
         # Clean up session after download (optional: keep for re-downloads)
         # _pdf_sessions.pop(session_token, None)
@@ -1677,7 +1677,7 @@ async def export_conversation_pdf(conversation_id: str, scope: Optional[str] = "
         # Build filename
         title = conversation.get('title') or conversation.get('name') or 'conversation'
         safe_title = "".join(c if c.isalnum() or c in (' ', '-', '_') else '_' for c in title)[:50]
-        filename = f"Ultima_RAG_{safe_title}_{scope}.pdf"
+        filename = f"UltimaRAG_{safe_title}_{scope}.pdf"
         
         return StreamingResponse(
             io.BytesIO(pdf_bytes),

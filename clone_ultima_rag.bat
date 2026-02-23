@@ -15,7 +15,7 @@
 :: You should have received a copy of the GNU Affero General Public License
 :: along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-SET REPO_URL=https://github.com/PankajVarma-PUV/Ultima_RAG.git
+SET REPO_URL=https://github.com/PankajVarma-PUV/UltimaRAG.git
 
 echo 🛡️ UltimaRAG Repository Cloner
 echo ---------------------------------
@@ -31,22 +31,22 @@ if %errorlevel% neq 0 (
 
 echo 🚀 Cloning repository...
 :: Overwrite logic: Remove existing folder if it exists
-if exist "%~dp0Ultima_RAG" (
-    echo 🗑️ Existing Ultima_RAG folder detected. Overwriting...
-    rmdir /s /q "%~dp0Ultima_RAG"
+if exist "%~dp0UltimaRAG" (
+    echo 🗑️ Existing UltimaRAG folder detected. Overwriting...
+    rmdir /s /q "%~dp0UltimaRAG"
 )
 
 :: Use quotes around the path to handle spaces in folder names correctly
-git clone "%REPO_URL%" "%~dp0Ultima_RAG"
+git clone "%REPO_URL%" "%~dp0UltimaRAG"
 
 if %errorlevel% equ 0 (
     echo ---------------------------------
-    echo ✅ SUCCESS! Repository cloned into 'Ultima_RAG' folder.
-    echo 📂 Path: "%~dp0Ultima_RAG"
+    echo ✅ SUCCESS! Repository cloned into 'UltimaRAG' folder.
+    echo 📂 Path: "%~dp0UltimaRAG"
     echo.
     echo 💡 NEXT STEP:
-    echo 1. Go into the 'Ultima_RAG' folder.
-    echo 2. Run 'run_Ultima_RAG.bat' to install dependencies and start the app.
+    echo 1. Go into the 'UltimaRAG' folder.
+    echo 2. Run 'run_UltimaRAG.bat' to install dependencies and start the app.
 ) else (
     echo ---------------------------------
     echo ❌ FAILED to clone. Check your internet or repository visibility.

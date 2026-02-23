@@ -15,7 +15,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-Refusal Gate Agent for Ultima_RAG
+Refusal Gate Agent for UltimaRAG
 Now operates as a Quality Indicator agent - always returns answers with confidence scores.
 Changed from "reject policy" to "always show with fact score" policy.
 """

@@ -212,7 +212,7 @@ class RefusalGateConfig:
 # SynthesisConfig has been intentionally REMOVED.
 # The iterative continuation loop (CONTINUE_PROMPT / MAX_CONTINUATION_LOOPS)
 # caused Context Inflation crashes on low-resource hardware (2048-ctx).
-# Ultima_RAG now uses Single-Shot generation with a prompt Token Budget Guard.
+# UltimaRAG now uses Single-Shot generation with a prompt Token Budget Guard.
 # Response quality is maintained via the Healer node in metacognitive_brain.py.
 
 

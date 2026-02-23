@@ -15,7 +15,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-Ollama Client for Ultima_RAG
+Ollama Client for UltimaRAG
 HTTP client for local Ollama API with automatic token management.
 """
 

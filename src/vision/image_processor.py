@@ -15,7 +15,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-Image Processor for Ultima_RAG (Upgraded to Ultima_RAG Elite).
+Image Processor for UltimaRAG (Upgraded to UltimaRAG Elite).
 Handles image preprocessing, OCR, and SOTA vision perception.
 
 SOTA Features:
@@ -76,7 +76,7 @@ class ImageProcessor:
 
     async def _process_tiled(self, img: Image.Image) -> str:
         """
-        SOTA Tiled Perception (Ultima_RAG Guard).
+        SOTA Tiled Perception (UltimaRAG Guard).
         Splits image into 2x2 grid and processes tiles SEQUENTIALLY to save VRAM.
         """
         w, h = img.size

@@ -45,7 +45,7 @@ class MultiStagePlanner:
             base_url=Config.ollama.BASE_URL,
             timeout=Config.ollama.TIMEOUT
         )
-        logger.info("Multi-Stage Execution Planner (Ultima_RAG Edition) initialized")
+        logger.info("Multi-Stage Execution Planner (UltimaRAG Edition) initialized")
 
     async def create_plan(self, query: str, intent: Intent, evidence: UnifiedEvidenceState) -> ExecutionPlan:
         """
@@ -69,7 +69,7 @@ class MultiStagePlanner:
         # For MULTI_TASK, we use Gemma-3-12B to decompose
         prompt = f"""
 <role>
-You are the Ultima_RAG Strategic Architect. Decompose complex user requests into a high-fidelity execution DAG with integrated quality gates.
+You are the UltimaRAG Strategic Architect. Decompose complex user requests into a high-fidelity execution DAG with integrated quality gates.
 </role>
 
 <user_input>

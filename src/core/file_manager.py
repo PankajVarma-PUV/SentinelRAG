@@ -15,7 +15,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-File Manager for Ultima_RAG Multimodal uploads.
+File Manager for UltimaRAG Multimodal uploads.
 Handles partitioning of uploads by conversation_id and file type.
 """
 

@@ -162,9 +162,9 @@ SCHEMA_REGISTRY = {
     ])
 }
 
-class Ultima_RAGDatabase:
+class UltimaRAGDatabase:
     """
-    SOTA Database Layer for Ultima_RAG using LanceDB.
+    SOTA Database Layer for UltimaRAG using LanceDB.
     Supports hierarchical organization (Projects/Folders) and Vector-native storage.
     
     INTEGRITY STANDARDS:
@@ -1380,13 +1380,13 @@ class Ultima_RAGDatabase:
 _db_instance = None
 _db_lock = threading.Lock()
 
-def get_database() -> Ultima_RAGDatabase:
-    """Get or create singleton Ultima_RAGDatabase instance with thread safety."""
+def get_database() -> UltimaRAGDatabase:
+    """Get or create singleton UltimaRAGDatabase instance with thread safety."""
     global _db_instance
     if _db_instance is None:
         with _db_lock:
             # Double-check pattern
             if _db_instance is None:
-                _db_instance = Ultima_RAGDatabase()
+                _db_instance = UltimaRAGDatabase()
     return _db_instance
 

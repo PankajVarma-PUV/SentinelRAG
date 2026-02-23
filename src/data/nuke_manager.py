@@ -15,7 +15,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-Nuke Manager for Ultima_RAG
+Nuke Manager for UltimaRAG
 Coordinates full-system factory resets across all data layers.
 """
 

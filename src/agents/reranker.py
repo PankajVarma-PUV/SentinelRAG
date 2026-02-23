@@ -15,7 +15,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-Reranker Module for Ultima_RAG
+Reranker Module for UltimaRAG
 Cross-encoder reranking for precision filtering.
 """
 

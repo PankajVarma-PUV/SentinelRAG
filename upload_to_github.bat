@@ -18,13 +18,13 @@
 SETLOCAL EnableDelayedExpansion
 
 :: --- CONFIGURATION ---
-SET REPO_URL=https://github.com/PankajVarma-PUV/Ultima_RAG.git
+SET REPO_URL=https://github.com/PankajVarma-PUV/UltimaRAG.git
 SET BRANCH=main
 
 :: Use UTF-8 for better character support in modern CMD/PowerShell
 chcp 65001 >nul
 
-echo 🛡️ Ultima_RAG GitHub Recovery Uploader
+echo 🛡️ UltimaRAG GitHub Recovery Uploader
 echo ---------------------------------------
 
 :: 1. Force Cleanup of any stuck background processes
@@ -50,7 +50,7 @@ git add -A
 
 :: 5. Commit with robust quoting
 SET /P commit_msg="💬 Enter commit message (or press enter for default): "
-if "%commit_msg%"=="" SET commit_msg=Finalized SOTA Ultima_RAG Architecture
+if "%commit_msg%"=="" SET commit_msg=Finalized SOTA UltimaRAG Architecture
 
 echo 💾 Committing...
 git commit -m "%commit_msg%"
@@ -67,7 +67,7 @@ git push -u origin %BRANCH% --force
 if %errorlevel% equ 0 (
     echo ---------------------------------------
     echo ✅ SUCCESS! Your entire LOCAL codebase is now live on GitHub.
-    echo 🌐 Visit: https://github.com/PankajVarma-PUV/Ultima_RAG
+    echo 🌐 Visit: https://github.com/PankajVarma-PUV/UltimaRAG
 ) else (
     echo -----------------------------------
     echo ❌ FAILED to push. 

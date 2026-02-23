@@ -15,7 +15,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-Query Analyzer Agent for Ultima_RAG
+Query Analyzer Agent for UltimaRAG
 Transforms user queries into retrieval-optimized formats with intent detection.
 Uses local Ollama with configured model for LLM operations.
 """

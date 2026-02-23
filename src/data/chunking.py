@@ -15,7 +15,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-Document Chunking Module for Ultima_RAG
+Document Chunking Module for UltimaRAG
 Implements semantic, fixed-size, and paragraph-based chunking strategies using tokens.
 """
 

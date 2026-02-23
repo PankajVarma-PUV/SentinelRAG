@@ -15,7 +15,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-API Routes for Ultima_RAG
+API Routes for UltimaRAG
 Additional route handlers and utilities.
 """
 

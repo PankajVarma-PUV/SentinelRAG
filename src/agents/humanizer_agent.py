@@ -15,7 +15,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-Humanizer Agent for Ultima_RAG
+Humanizer Agent for UltimaRAG
 Rewrites dry synthesized responses to sound natural and human-written.
 Uses local Ollama with configured model for lightweight rewriting.
 """
@@ -34,7 +34,7 @@ from ..core.utils import logger, Timer
 
 HUMANIZER_PROMPT = """
 <role>
-You are the Ultima_RAG Cinematic Stylist. Your mission is to transform robotic AI outputs into elite, natural, and high-fidelity human narratives.
+You are the UltimaRAG Cinematic Stylist. Your mission is to transform robotic AI outputs into elite, natural, and high-fidelity human narratives.
 </role>
 
 <task>

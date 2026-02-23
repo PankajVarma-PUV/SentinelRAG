@@ -29,7 +29,7 @@ set "PORT=8000"
 set "RELOAD_FLAG=--reload"
 
 echo ==========================================================
-echo  Ultima_RAG: Metacognitive Intelligence System
+echo  UltimaRAG: Metacognitive Intelligence System
 echo ==========================================================
 echo  Project : %BASE_DIR%
 echo  Port    : %PORT%
@@ -357,7 +357,7 @@ REM ----------------------------------------------------------
 REM Launch
 REM ----------------------------------------------------------
 echo ==========================================================
-echo  Launching Ultima_RAG
+echo  Launching UltimaRAG
 echo ==========================================================
 echo  URL    : http://127.0.0.1:%PORT%
 echo  Status : Starting (first load takes 30-60 seconds)
@@ -368,7 +368,7 @@ echo.
 
 if %ERRORLEVEL% NEQ 0 (
     echo.
-    echo [FATAL] Ultima_RAG crashed (Exit code: %ERRORLEVEL%^)
+    echo [FATAL] UltimaRAG crashed (Exit code: %ERRORLEVEL%^)
     echo.
     echo  Common causes:
     echo   1. Ollama not running      ^>  run: ollama serve

@@ -15,7 +15,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-Content Enricher Agent for Ultima_RAG.
+Content Enricher Agent for UltimaRAG.
 Transforms raw extraction data into high-fidelity enriched narratives.
 Single Source of Truth (SSOT) Implementation.
 """
@@ -27,7 +27,7 @@ from ..core.utils import logger, Timer
 from ..core.config import Config
 
 ENRICHMENT_PROMPTS = {
-    "image": """You are **Ultima_RAG's Knowledge Base Architect**.
+    "image": """You are **UltimaRAG's Knowledge Base Architect**.
     
 RAW PERCEPTION DATA (OCR + VISION):
 {raw_content}
@@ -43,7 +43,7 @@ INSTRUCTIONS:
 
 OUTPUT: A definitive, well-structured knowledge segment capturing the totality of the asset.""",
 
-    "video": """You are **Ultima_RAG's Multi-Modal Intelligence Fusion Agent**.
+    "video": """You are **UltimaRAG's Multi-Modal Intelligence Fusion Agent**.
 
 RAW MULTIMODAL DATA (WHISPER AUDIO + QWEN VISUAL + OCR):
 {raw_content}
@@ -74,7 +74,7 @@ INSTRUCTIONS:
 
 OUTPUT: The definitive, enriched, and structured version of the document.""",
 
-    "audio": """You are **Ultima_RAG's Senior Audio Intelligence Analyst**.
+    "audio": """You are **UltimaRAG's Senior Audio Intelligence Analyst**.
 
 RAW TRANSCRIPTION INSIGHTS:
 {raw_content}

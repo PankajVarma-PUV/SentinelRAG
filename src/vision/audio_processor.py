@@ -15,7 +15,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-Audio Processor for Ultima_RAG.
+Audio Processor for UltimaRAG.
 Uses Faster-Whisper for high-speed local transcription.
 
 Output structure:

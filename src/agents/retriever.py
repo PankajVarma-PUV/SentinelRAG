@@ -20,18 +20,18 @@ import json
 from datetime import datetime
 
 from ..core.utils import logger, Timer
-from ..core.database import Ultima_RAGDatabase
+from ..core.database import UltimaRAGDatabase
 from ..data.embedder import DeterministicEmbedder, get_embedder
 
 class RetrieverAgent:
     """
-    SOTA Retriever Agent for Ultima_RAG.
+    SOTA Retriever Agent for UltimaRAG.
     Utilizes LanceDB for project-aware, vector-native retrieval.
     """
     
     def __init__(
         self,
-        db: Ultima_RAGDatabase,
+        db: UltimaRAGDatabase,
         embedder: Optional[DeterministicEmbedder] = None
     ):
         from ..core.config import RerankerConfig
@@ -48,7 +48,7 @@ class RetrieverAgent:
             logger.error(f"Failed to initialize reranker {RerankerConfig.MODEL_NAME}: {e}")
             self.reranker = None
             
-        logger.info(f"RetrieverAgent (Ultima_RAG Edition) initialized | Reranker: {RerankerConfig.MODEL_NAME}")
+        logger.info(f"RetrieverAgent (UltimaRAG Edition) initialized | Reranker: {RerankerConfig.MODEL_NAME}")
     
     async def retrieve(
         self,
@@ -68,7 +68,7 @@ class RetrieverAgent:
         # SOTA: Respect .env-driven global chunk limit if not overridden
         top_k = top_k or Config.retrieval.FINAL_TOP_K
 
-        with Timer("Ultima_RAG Retrieval + Rerank"):
+        with Timer("UltimaRAG Retrieval + Rerank"):
             # 1. Generate Query Embedding
             query_vector = self.embedder.encode(query).tolist()
             

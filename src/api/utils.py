@@ -15,7 +15,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-Utility functions for the Ultima_RAG API.
+Utility functions for the UltimaRAG API.
 Handles identity queries and streaming simulations.
 Cache-based duplicate query retrieval has been removed (intentionally).
 """
@@ -39,7 +39,7 @@ IDENTITY_KEYWORDS = [
 ]
 
 IDENTITY_RESPONSE = (
-    "I am **Ultima_RAG**, an elite metacognitive intelligence system created by "
+    "I am **UltimaRAG**, an elite metacognitive intelligence system created by "
     "**Pankaj Varma**.\n\n"
     "If you wish to connect with my creator, here are his contact details:\n\n"
     "📱 **WhatsApp / Telegram**: +91 9372123700\n\n"
@@ -49,7 +49,7 @@ IDENTITY_RESPONSE = (
 )
 
 def is_identity_query(query: str) -> bool:
-    """Check if query is asking about the creator/owner of Ultima_RAG."""
+    """Check if query is asking about the creator/owner of UltimaRAG."""
     q = query.strip().lower()
     return any(kw in q for kw in IDENTITY_KEYWORDS)
 

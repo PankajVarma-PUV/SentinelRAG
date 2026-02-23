@@ -15,7 +15,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-Web Breakout Agent — Ultima_RAG Live Web Search Tool
+Web Breakout Agent — UltimaRAG Live Web Search Tool
 
 Uses DuckDuckGo (no API key) and Trafilatura (clean text extraction).
 Designed for 6GB VRAM systems: hard-truncates each source to 1000 chars.

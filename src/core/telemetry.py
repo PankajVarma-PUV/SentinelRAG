@@ -15,7 +15,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-Ultima_RAG Telemetry Utility
+UltimaRAG Telemetry Utility
 Captures agentic activity and performance metrics for real-time UI updates.
 """
 from typing import Dict, Any, Optional

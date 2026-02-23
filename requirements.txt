@@ -1,5 +1,5 @@
 # ==========================================================
-# Ultima_RAG - Python Dependencies
+# UltimaRAG - Python Dependencies
 # ==========================================================
 #
 # IMPORTANT: torch, torchvision, torchaudio are intentionally

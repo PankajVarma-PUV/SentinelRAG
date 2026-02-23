@@ -15,7 +15,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-Utility Functions for Ultima_RAG
+Utility Functions for UltimaRAG
 Common utilities including deterministic mode, logging, and text processing.
 """
 
@@ -44,7 +44,7 @@ def setup_logging(level: int = logging.INFO) -> logging.Logger:
     logging.getLogger("sentence_transformers").setLevel(logging.ERROR)
     logging.getLogger("httpx").setLevel(logging.WARNING)
     
-    return logging.getLogger('Ultima_RAG')
+    return logging.getLogger('UltimaRAG')
 
 
 logger = setup_logging()

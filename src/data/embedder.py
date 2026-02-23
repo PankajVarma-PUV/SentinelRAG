@@ -15,7 +15,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-Embedding Module for Ultima_RAG
+Embedding Module for UltimaRAG
 Deterministic embedder with caching for reproducible retrieval.
 """
 

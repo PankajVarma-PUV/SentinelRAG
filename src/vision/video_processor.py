@@ -15,7 +15,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-Video Processor for Ultima_RAG.
+Video Processor for UltimaRAG.
 Orchestrates frame extraction, OCR, vision perception, audio transcription,
 and LongT5 deduplication for video content.
 
@@ -92,7 +92,7 @@ class VideoProcessor:
         3. OCR & Vision Perception on Significant Frames
         4. Unified Audio-Visual Narrative Fusion (Config-defined LLM)
         """
-        logger.info(f"🚀 Ultima_RAG Video Pipeline: {os.path.basename(file_path)}")
+        logger.info(f"🚀 UltimaRAG Video Pipeline: {os.path.basename(file_path)}")
         scraped_items = []
         
         try:

@@ -1,6 +1,6 @@
-# 🛡️ Ultima_RAG: SOTA Metacognitive RAG Pipeline
+# 🛡️ UltimaRAG: SOTA Metacognitive RAG Pipeline
 
-Ultima_RAG is an advanced, autonomous Retrieval-Augmented Generation (RAG) system built with a **Metacognitive Brain** architecture. It leverages multi-agent orchestration, state-of-the-art vector storage, and a cinematic streaming UI to deliver high-precision, grounded, and multimodal AI responses.
+UltimaRAG is an advanced, autonomous Retrieval-Augmented Generation (RAG) system built with a **Metacognitive Brain** architecture. It leverages multi-agent orchestration, state-of-the-art vector storage, and a cinematic streaming UI to deliver high-precision, grounded, and multimodal AI responses.
 
 ![UltimaRAG Banner](https://img.shields.io/badge/Status-SOTA-blueviolet?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-green?style=for-the-badge)
@@ -8,7 +8,7 @@ Ultima_RAG is an advanced, autonomous Retrieval-Augmented Generation (RAG) syste
 
 ## 🧠 The Metacognitive Architecture
 
-Ultima_RAG doesn't just "retrieve and generate." It **reasons** through its own process using a LangGraph-powered graph:
+UltimaRAG doesn't just "retrieve and generate." It **reasons** through its own process using a LangGraph-powered graph:
 
 1.  **Intent Classification**: Dynamically identifies the nature of the query (e.g., Multi-task, Summarization, Retrieval).
 2.  **Streaming Thought-UI**: Surfaces the internal "inner monologue" of the agents to the user in real-time (o1-style).
@@ -32,7 +32,7 @@ Ultima_RAG doesn't just "retrieve and generate." It **reasons** through its own 
 
 ## 🚀 Getting Started (Local Execution)
 
-Ultima_RAG is designed to be run **locally** to ensure complete data privacy and control.
+UltimaRAG is designed to be run **locally** to ensure complete data privacy and control.
 
 ### Prerequisites
 - Python 3.10+
@@ -40,17 +40,17 @@ Ultima_RAG is designed to be run **locally** to ensure complete data privacy and
 
 ### Installation & Setup
 
-Ultima_RAG features a **Smart setup script** that automatically detects your hardware (NVIDIA GPU vs CPU) and installs the correct ML stack for you.
+UltimaRAG features a **Smart setup script** that automatically detects your hardware (NVIDIA GPU vs CPU) and installs the correct ML stack for you.
 
 1.  **Clone the repository**:
     ```bash
-    git clone https://github.com/your-username/Ultima_RAG.git
-    cd Ultima_RAG
+    git clone https://github.com/your-username/UltimaRAG.git
+    cd UltimaRAG
     ```
 2.  **Start the Application**:
     Simply run the automated startup script. It will create a virtual environment, install the correct version of Torch for your hardware, and launch the server:
     ```bash
-    run_Ultima_RAG.bat
+    run_UltimaRAG.bat
     ```
 The API server will start at `http://localhost:8000`, and the UI will be accessible in your web browser.
 
@@ -70,5 +70,5 @@ Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for gui
 UltimaRAG is licensed under the **GNU Affero General Public License v3.0**. See [LICENSE](LICENSE) for more information.
 
 ---
-*Built with ❤️ by the Ultima_RAG Team*
+*Built with ❤️ by the UltimaRAG Team*
 

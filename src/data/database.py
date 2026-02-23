@@ -15,7 +15,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-Database Module for Ultima_RAG
+Database Module for UltimaRAG
 Supports both SQLite (local, zero-config) and PostgreSQL (cloud).
 Database type is selected via DB_TYPE environment variable.
 """
@@ -141,9 +141,9 @@ class SQLiteDatabase(BaseDatabase):
         Initialize SQLite database.
         
         Args:
-            db_path: Path to SQLite database file. Defaults to data/Ultima_RAG.db
+            db_path: Path to SQLite database file. Defaults to data/UltimaRAG.db
         """
-        default_path = Path(__file__).parent.parent.parent / "data" / "Ultima_RAG.db"
+        default_path = Path(__file__).parent.parent.parent / "data" / "UltimaRAG.db"
         self.db_path = Path(db_path) if db_path else default_path
         self._connection: Optional[sqlite3.Connection] = None
         self._connected = False

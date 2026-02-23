@@ -15,7 +15,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-Fact Checker Agent for Ultima_RAG
+Fact Checker Agent for UltimaRAG
 Validates synthesized answers against retrieved evidence using NLI.
 Uses local Ollama with configured model for LLM operations.
 """

@@ -15,7 +15,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-Synthesis Agent for Ultima_RAG
+Synthesis Agent for UltimaRAG
 Generates answers strictly from provided context with citations.
 Uses local Ollama with Config-defined model for LLM operations.
 """
