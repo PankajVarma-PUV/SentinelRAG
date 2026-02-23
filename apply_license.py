@@ -1,4 +1,6 @@
-# UltimaRAG — Multi-Agent RAG System
+import os
+
+header = """# UltimaRAG — Multi-Agent RAG System
 # Copyright (C) 2026 Pankaj Varma
 #
 # This program is free software: you can redistribute it and/or modify
@@ -14,4 +16,20 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-# Core module
+"""
+
+def apply_license(directory):
+    for root, dirs, files in os.walk(directory):
+        for file in files:
+            if file.endswith(".py"):
+                path = os.path.join(root, file)
+                with open(path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                
+                if "# UltimaRAG" not in content:
+                    print(f"Applying license to {path}")
+                    with open(path, 'w', encoding='utf-8') as f:
+                        f.write(header + content)
+
+if __name__ == "__main__":
+    apply_license("src")
