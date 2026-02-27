@@ -58,7 +58,7 @@ class QueryAnalyzer:
         else:
             logger.info(f"QueryAnalyzer initialized with Ollama: {model}")
     
-    def analyze(self, query: str) -> Dict:
+    async def analyze(self, query: str) -> Dict:
         """
         Analyze a user query and return structured analysis.
         
@@ -71,8 +71,8 @@ class QueryAnalyzer:
         with Timer("Query Analysis"):
             try:
                 # Try LLM-based analysis first
-                if self.client.is_available():
-                    result = self._analyze_with_llm(query)
+                if await self.client.is_available():
+                    result = await self._analyze_with_llm(query)
                 else:
                     result = self._analyze_fallback(query)
             except Exception as e:
@@ -82,33 +82,43 @@ class QueryAnalyzer:
         # Ensure all required fields exist
         result = self._validate_and_complete(result, query)
         
-        logger.info(f"Query analyzed: intent={result['intent']}, difficulty={result['difficulty']}")
+        logger.info(f"Query analyzed: intent={result.get('intent', 'unknown')}, difficulty={result.get('difficulty', 'unknown')}")
         return result
     
-    def _analyze_with_llm(self, query: str) -> Dict:
+    async def _analyze_with_llm(self, query: str) -> Dict:
         """Use Ollama to analyze the query"""
         prompt = QUERY_ANALYSIS_PROMPT.format(query=query)
         
-        response = self.client.generate(
+        response = await self.client.generate(
             prompt,
             temperature=OllamaConfig.TEMPERATURE,
-            max_tokens=1024
+            max_tokens=1024,
+            response_format="json"  # Native Output Guard
         )
         
         # Parse JSON response
-        response_text = response.strip()
+        response_text = response.get("response", "").strip() if isinstance(response, dict) else response.strip()
         
-        # Clean up markdown code blocks if present
+        # SOTA: Defensively strip <think> reasoning blocks before parsing JSON
+        response_text = re.sub(r'<think>[\s\S]*?</think>', '', response_text, flags=re.IGNORECASE).strip()
+        
+        # Fallback regex parsing just in case
         if response_text.startswith("```"):
             response_text = re.sub(r'^```(?:json)?\n?', '', response_text)
             response_text = re.sub(r'\n?```$', '', response_text)
-        
-        # Try to find JSON in response
+            
         json_match = re.search(r'\{[\s\S]*\}', response_text)
         if json_match:
-            return json.loads(json_match.group())
-        
-        return json.loads(response_text)
+            try:
+                return json.loads(json_match.group())
+            except json.JSONDecodeError:
+                pass
+                
+        try:
+            return json.loads(response_text)
+        except json.JSONDecodeError:
+            logger.error(f"Failed to parse LLM JSON: {response_text[:100]}...")
+            return self._analyze_fallback(query)
     
     def _analyze_fallback(self, query: str) -> Dict:
         """
@@ -203,8 +213,8 @@ def get_query_analyzer() -> QueryAnalyzer:
     return QueryAnalyzer()
 
 
-def analyze_query(query: str) -> Dict:
+async def analyze_query(query: str) -> Dict:
     """Convenience function to analyze a query"""
     analyzer = get_query_analyzer()
-    return analyzer.analyze(query)
+    return await analyzer.analyze(query)
 

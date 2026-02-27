@@ -66,7 +66,7 @@ class MultiStagePlanner:
             )
             return ExecutionPlan(query=query, steps=[step], unified_evidence=evidence)
             
-        # For MULTI_TASK, we use Gemma-3-12B to decompose
+        # For MULTI_TASK, we use gemma3:4b to decompose
         prompt = f"""
 <role>
 You are the UltimaRAG Strategic Architect. Decompose complex user requests into a high-fidelity execution DAG with integrated quality gates.
@@ -103,6 +103,10 @@ STRATEGIC PLAN:"""
             
             # Clean JSON
             import re
+            
+            # SOTA: Defensively strip <think> reasoning blocks before parsing JSON
+            result_text = re.sub(r'<think>[\s\S]*?</think>', '', result_text, flags=re.IGNORECASE).strip()
+            
             if "```" in result_text:
                 result_text = re.sub(r'```(?:json)?\n?', '', result_text)
                 result_text = re.sub(r'\n?```$', '', result_text)

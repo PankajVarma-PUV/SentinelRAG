@@ -70,7 +70,7 @@ class FactChecker:
         
         logger.info(f"FactChecker initialized with NLI model: {nli_model_name}")
     
-    def check_facts(
+    async def check_facts(
         self,
         synthesis_output: Dict,
         source_chunks: List[Dict]
@@ -128,7 +128,7 @@ class FactChecker:
         
         with Timer("Fact Checking (LLM-based)"):
             # Use LLM-based evaluation
-            llm_result = self._evaluate_with_llm(
+            llm_result = await self._evaluate_with_llm(
                 context=context,
                 question=synthesis_output.get("metadata", {}).get("query", ""),
                 response=answer
@@ -163,7 +163,7 @@ class FactChecker:
         
         return result
     
-    def _evaluate_with_llm(self, context: str, question: str, response: str) -> Dict:
+    async def _evaluate_with_llm(self, context: str, question: str, response: str) -> Dict:
         """
         Use Gemma3:4b to evaluate response accuracy against context.
         """
@@ -177,7 +177,7 @@ class FactChecker:
         )
         
         try:
-            if not self.client.is_available():
+            if not await self.client.is_available():
                 # Fallback if Ollama not available
                 logger.warning("Ollama not available for fact check, using default score")
                 return {
@@ -187,7 +187,7 @@ class FactChecker:
                     "is_accurate": True
                 }
             
-            result = self.client.generate(
+            result = await self.client.generate(
                 prompt,
                 temperature=0.1,  # Low temperature for consistent evaluation
                 max_tokens=Config.ollama_multi_model.LIGHTWEIGHT_MAX_TOKENS
@@ -197,28 +197,53 @@ class FactChecker:
             # Parse JSON response
             result_text = result_text.strip()
             
+            # SOTA: Defensively strip <think> reasoning blocks before parsing JSON
+            result_text = re.sub(r'<think>[\s\S]*?</think>', '', result_text, flags=re.IGNORECASE).strip()
+            
             # Clean up markdown if present
             if result_text.startswith("```"):
                 result_text = re.sub(r'^```(?:json)?\n?', '', result_text)
                 result_text = re.sub(r'\n?```$', '', result_text)
             
-            # Try to parse JSON
-            json_match = re.search(r'\{[\s\S]*\}', result_text)
-            if json_match:
-                evaluation = json.loads(json_match.group())
-            else:
-                evaluation = json.loads(result_text)
+            from pydantic import BaseModel, ValidationError
+            from typing import List
             
-            # Validate and normalize score
+            # SOTA Phase 4: ReflectionAgent Schema Validation
+            class EvaluationSchema(BaseModel):
+                accuracy_score: float
+                reasoning: str
+                factual_errors: List[str]
+                is_accurate: bool
+                
+            try:
+                # Try to parse JSON
+                json_match = re.search(r'\{[\s\S]*\}', result_text)
+                if json_match:
+                    raw_eval = json.loads(json_match.group())
+                else:
+                    raw_eval = json.loads(result_text)
+                    
+                # Validate against schema
+                valid_eval = EvaluationSchema(**raw_eval)
+                evaluation = valid_eval.model_dump()
+            except (json.JSONDecodeError, ValidationError) as schema_err:
+                logger.warning(f"🚨 SOTA ReflectionAgent: Schema validation failed ({schema_err}). Using raw/fallback logic.")
+                # Fallback to loose dictionary if strict validation fails
+                evaluation = {
+                    "accuracy_score": 0.7,
+                    "reasoning": "Validation parsing fallback applied.",
+                    "factual_errors": [],
+                    "is_accurate": True,
+                    "reflection": {"is_relevant": True, "is_supported": True, "has_utility": True}
+                }
+            
+            # Additional bounds checking
             raw_score = evaluation.get("accuracy_score", 0.7)
-            
-            # Robust Parsing Strategy
             if isinstance(raw_score, str):
-                # Handle "85%" or "0.85" or "85"
                 raw_score = raw_score.replace('%', '').strip()
                 try:
                     score = float(raw_score)
-                    if score > 1.0: score = score / 100.0 # Convert 85 to 0.85
+                    if score > 1.0: score = score / 100.0
                 except ValueError:
                     score = 0.7
             else:
@@ -238,7 +263,7 @@ class FactChecker:
                 "is_accurate": True
             }
     
-    def evaluate_relevance(self, question: str, source_chunks: List[Dict]) -> Dict:
+    async def evaluate_relevance(self, question: str, source_chunks: List[Dict]) -> Dict:
         """
         Evaluate if the user's question is relevant to the document content.
         
@@ -275,7 +300,7 @@ class FactChecker:
         )
         
         try:
-            if not self.client.is_available():
+            if not await self.client.is_available():
                 return {
                     "relevance_score": 0.7,
                     "is_relevant": True,
@@ -284,7 +309,7 @@ class FactChecker:
                     "question_topic": question
                 }
             
-            result = self.client.generate(
+            result = await self.client.generate(
                 prompt,
                 temperature=0.1,
                 max_tokens=Config.ollama_multi_model.LIGHTWEIGHT_MAX_TOKENS
@@ -292,6 +317,9 @@ class FactChecker:
             result_text = result.get("response", "") if isinstance(result, dict) else result
             
             result_text = result_text.strip()
+            
+            # SOTA: Defensively strip <think> reasoning blocks before parsing JSON
+            result_text = re.sub(r'<think>[\s\S]*?</think>', '', result_text, flags=re.IGNORECASE).strip()
             
             # Clean up markdown if present
             if result_text.startswith("```"):
@@ -323,30 +351,33 @@ class FactChecker:
                 "question_topic": question
             }
     
-    def _extract_claims(self, answer: str) -> List[str]:
+    async def _extract_claims(self, answer: str) -> List[str]:
         """
         Extract atomic claims from the answer.
         Uses LLM if available, otherwise falls back to sentence splitting.
         """
-        if self.client.is_available():
+        if await self.client.is_available():
             try:
-                return self._extract_claims_with_llm(answer)
+                return await self._extract_claims_with_llm(answer)
             except Exception as e:
                 logger.warning(f"LLM claim extraction failed: {e}")
         
         return self._extract_claims_fallback(answer)
     
-    def _extract_claims_with_llm(self, answer: str) -> List[str]:
+    async def _extract_claims_with_llm(self, answer: str) -> List[str]:
         """Use Ollama to extract atomic claims"""
         prompt = CLAIM_EXTRACTION_PROMPT.format(answer=answer)
         
-        response = self.client.generate(
+        response = await self.client.generate(
             prompt,
             temperature=0.0,
             max_tokens=Config.ollama_multi_model.LIGHTWEIGHT_MAX_TOKENS
         )
         
         response_text = response.strip()
+        
+        # SOTA: Defensively strip <think> reasoning blocks before parsing JSON
+        response_text = re.sub(r'<think>[\s\S]*?</think>', '', response_text, flags=re.IGNORECASE).strip()
         
         # Clean up markdown if present
         if response_text.startswith("```"):
@@ -448,11 +479,11 @@ def get_fact_checker(
     )
 
 
-def check_facts(
+async def check_facts(
     synthesis_output: Dict,
     source_chunks: List[Dict]
 ) -> Dict:
     """Convenience function to check facts"""
     checker = get_fact_checker()
-    return checker.check_facts(synthesis_output, source_chunks)
+    return await checker.check_facts(synthesis_output, source_chunks)
 

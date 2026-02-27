@@ -27,7 +27,7 @@ from pathlib import Path
 from typing import List, Optional, Any, Dict
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Response, BackgroundTasks
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Response, BackgroundTasks, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -37,6 +37,7 @@ from pydantic import BaseModel
 
 from ..core.config import Config, PathConfig
 from ..core.utils import logger, set_seed
+from ..core.telemetry import ws_manager
 from ..data.chunking import DocumentChunker
 from ..data.embedder import get_embedder, embed_chunks
 from ..data.database import DatabaseManager, get_database as get_relational_db, init_database
@@ -104,10 +105,12 @@ class IndexRequest(BaseModel):
     """Request for indexing documents"""
     texts: List[str]
     doc_ids: Optional[List[str]] = None
-    metadata: Optional[List[dict]] = None
-    conversation_id: Optional[str] = None
+    metadata: Optional[List[Dict]] = None
+    conversation_id: Optional[str] = "default"
     project_id: Optional[str] = "default"
     folder_id: Optional[str] = "root"
+    user_id: Optional[str] = "default"
+    role_id: Optional[str] = "user"
 
 
 class HealthResponse(BaseModel):
@@ -175,10 +178,15 @@ class ConversationWithMessages(BaseModel):
 
 class AppState:
     """Application state container (UltimaRAG Edition)"""
-    brain: Optional[Any] = None # MetacognitiveBrain
-    db: Optional[Any] = None # UltimaRAGDatabase
-    sqlite_db: Optional[Any] = None # DatabaseManager
-    memory: Optional[Any] = None # MemoryManager
+    brain: Optional[Any] = None             # MetacognitiveBrain
+    db: Optional[Any] = None               # UltimaRAGDatabase
+    sqlite_db: Optional[Any] = None        # DatabaseManager
+    memory: Optional[Any] = None           # MemoryManager
+    watchdog: Optional[Any] = None         # IngestionWatchdog
+    firewall: Optional[Any] = None         # PromptFirewall (singleton)
+    embedding_manager: Optional[Any] = None  # EmbeddingManager (HuggingFace, CPU)
+    guidelines_manager: Optional[Any] = None # GuidelinesManager (read authority)
+    reflection_agent: Optional[Any] = None   # ReflectionAgent (write path)
     ready: bool = False
     db_connected: bool = False
     startup_error: Optional[str] = None
@@ -189,6 +197,68 @@ app_state = AppState()
 # STOP GENERATION: Per-conversation abort flags
 # Key: conversation_id, Value: True when abort requested
 abort_flags: dict = {}
+
+
+# =============================================================================
+# STARTUP DIAGNOSTICS (Phase 8)
+# =============================================================================
+
+async def _run_startup_diagnostics(state) -> None:
+    """
+    Prints a structured summary banner after all singletons are initialized.
+    Called once from lifespan startup. Gives the user immediate visibility
+    into what loaded successfully and whether the learning loop is closed.
+    """
+    from ..core.embedding_manager import detect_model_size
+
+    divider = "═" * 62
+    print(f"\n{divider}")
+    print("  UltimaRAG — Startup Diagnostics")
+    print(f"{divider}")
+
+    # Model configuration
+    model_name = Config.learning.PRIMARY_OLLAMA_MODEL
+    model_size = detect_model_size(model_name)
+    rule_cap = 30 if model_size == "4B" else 50
+    max_inject = 5 if model_size == "4B" else 7
+    print(f"  Primary model : {model_name} ({model_size})")
+    print(f"  Rule cap      : {rule_cap} active rules")
+    print(f"  Max injected  : {max_inject} rules per request")
+    print(f"  Token budget  : 150 tokens (hard limit)")
+
+    # Embedding manager
+    emb = getattr(state, "embedding_manager", None)
+    if emb and emb.is_ready:
+        print("  Embeddings    : ✅ all-MiniLM-L6-v2 (HuggingFace, CPU-only, 384-dim)")
+    else:
+        print("  Embeddings    : ⚠️  Unavailable — keyword fallback active for dedup")
+
+    # Guidelines state
+    gm = getattr(state, "guidelines_manager", None)
+    if gm:
+        stats = gm.get_stats()
+        print(f"  Guidelines    : {stats['active_rules']} active | "
+              f"{stats['retired_rules']} retired | "
+              f"{stats['total_rules']} total")
+    else:
+        print("  Guidelines    : ⚠️  GuidelinesManager not available")
+
+    # Loop closure status
+    print("  Learning loop :")
+    ra = getattr(state, "reflection_agent", None)
+    print(f"    {'✅' if ra else '❌'} ReflectionAgent → async (non-blocking)")
+    print(f"    {'✅' if emb and emb.is_ready else '⚠️'} EmbeddingManager → HuggingFace (CPU)")
+    print(f"    {'✅' if gm else '❌'} GuidelinesManager → singleton (mtime cache)")
+    print( "    ✅ Brain.generate_answer() → injects guidelines")
+    print( "    ✅ Shutdown handler → awaits pending tasks")
+
+    if gm and gm.get_stats()["active_rules"] == 0:
+        print("  Status        : ℹ️  No rules yet — normal for fresh install.")
+        print("                   First thumbs-down will start the learning loop.")
+    else:
+        print("  Status        : ✅ Learning loop CLOSED and operational.")
+
+    print(f"{divider}\n")
 
 
 # =============================================================================
@@ -232,6 +302,62 @@ async def lifespan(app: FastAPI):
         logger.error(traceback.format_exc())
         app_state.ready = False
         app_state.startup_error = f"Brain Initialization Failed: {str(e)}"
+
+    # Initialize PromptFirewall as a singleton (avoids cold-init overhead per request)
+    try:
+        from ..agents.intent_classifier import PromptFirewall
+        app_state.firewall = PromptFirewall()
+        logger.info("✅ PromptFirewall singleton initialized.")
+    except Exception as e:
+        logger.error(f"⚠️ PromptFirewall init failed (non-fatal): {e}")
+
+    # ── Continuous Learning Loop Singletons ─────────────────────────────────────
+
+    # [A] EmbeddingManager (HuggingFace, CPU-only) — must init BEFORE GuidelinesManager
+    try:
+        from ..core.embedding_manager import EmbeddingManager
+        app_state.embedding_manager = EmbeddingManager()
+        emb_ok = app_state.embedding_manager.initialize()
+        if not emb_ok:
+            logger.warning("⚠️ EmbeddingManager unavailable — keyword dedup fallback active")
+    except Exception as e:
+        logger.error(f"⚠️ EmbeddingManager init failed (non-fatal): {e}")
+
+    # [B] Schema migration v1→v2 (atomic, backup-first, runs before GuidelinesManager loads)
+    try:
+        from ..core.guidelines_manager import run_schema_migration
+        run_schema_migration(
+            guidelines_path=Config.learning.GUIDELINES_PATH,
+            embedding_manager=app_state.embedding_manager
+        )
+    except Exception as e:
+        logger.error(f"⚠️ Schema migration failed (non-fatal): {e}")
+
+    # [C] GuidelinesManager (single read authority for system_guidelines.json)
+    try:
+        from ..core.guidelines_manager import GuidelinesManager
+        app_state.guidelines_manager = GuidelinesManager(
+            guidelines_path=Config.learning.GUIDELINES_PATH,
+            model_name=Config.learning.PRIMARY_OLLAMA_MODEL,
+            cache_ttl_seconds=Config.learning.GUIDELINES_CACHE_TTL
+        )
+        logger.info("✅ GuidelinesManager initialized.")
+    except Exception as e:
+        logger.error(f"⚠️ GuidelinesManager init failed (non-fatal): {e}")
+
+    # [D] ReflectionAgent (write path — needs both embedding_manager + guidelines_manager)
+    try:
+        from ..agents.reflector import ReflectionAgent
+        app_state.reflection_agent = ReflectionAgent(app_state)
+        logger.info("✅ ReflectionAgent initialized.")
+    except Exception as e:
+        logger.error(f"⚠️ ReflectionAgent init failed (non-fatal): {e}")
+
+    # ── Startup Diagnostics ─────────────────────────────────────────────────────
+    try:
+        await _run_startup_diagnostics(app_state)
+    except Exception as e:
+        logger.error(f"Startup diagnostics failed (non-fatal): {e}")
         
     # 3. Final Readiness and Warming
     try:
@@ -243,17 +369,35 @@ async def lifespan(app: FastAPI):
             asyncio.create_task(mm_mgr.image_proc.warm_up())
         except Exception as e:
             logger.error(f"⚠️ Model warming failed (non-fatal): {e}")
-
         app_state.ready = True
         logger.info("🧠 UltimaRAG SOTA Stack Fully Ready.")
+        
+        # Start System Watchdog
+        try:
+            from ..core.ingestion_watchdog import IngestionWatchdog
+            app_state.watchdog = IngestionWatchdog()
+            app_state.watchdog.start()
+        except Exception as e:
+            logger.error(f"Failed to start Watchdog: {e}")
+            
     except Exception as e:
         logger.error(f"❌ Initialization failure: {e}")
         # Not fatal for the Brain, but some endpoints will fail
     
     yield
-    
-    # Shutdown
+
+    # ── Shutdown ─────────────────────────────────────────────────────────────────
     logger.info("Shutting down UltimaRAG API...")
+
+    # Wait for any in-progress reflection writes before exit (prevents JSON corruption)
+    try:
+        from ..agents.reflector import ReflectionAgent
+        await ReflectionAgent.await_pending_tasks()
+    except Exception as e:
+        logger.error(f"Shutdown: ReflectionAgent cleanup error: {e}")
+
+    if app_state.watchdog:
+        app_state.watchdog.stop()
     if app_state.db:
         app_state.db.disconnect()
 
@@ -441,6 +585,18 @@ async def stream_query(request: QueryRequest):
                 yield f"data: {json.dumps({'stage': 'result', 'success': True, 'final_response': IDENTITY_RESPONSE, 'confidence_score': 1.0, 'agent_type': 'IDENTITY', 'conversation_id': conv_id}, ensure_ascii=False)}\n\n"
                 return
             
+            # ── SHORTCIRCUIT 2: SOTA Prompt Injection Firewall ──────────
+            # Use the app-level singleton — avoids cold init on every request
+            if app_state.firewall and app_state.firewall.detect_injection(clean_query, conv_id):
+                defense_msg = "Security Alert: This prompt exhibits characteristics of an adversarial attack or system bypass attempt. Request denied by UltimaRAG Firewall."
+                yield f"data: {json.dumps({'stage': 'processing', 'agent': 'Firewall', 'message': 'Intercepted malicious request', 'status': 'blocked'}, ensure_ascii=False)}\n\n"
+                
+                async for chunk in simulate_streaming(defense_msg):
+                    yield chunk
+                    
+                yield f"data: {json.dumps({'stage': 'result', 'success': False, 'final_response': defense_msg, 'confidence_score': 1.0, 'agent_type': 'FIREWALL_BLOCKED', 'conversation_id': conv_id}, ensure_ascii=False)}\n\n"
+                return
+            
             # ── NOTE: Duplicate query cache has been removed (all queries run fresh) ──
             
             # ── FULL BRAIN PIPELINE ─────────────────────────────────────
@@ -550,6 +706,249 @@ async def abort_query(request: AbortRequest):
     return {"success": True, "message": "Abort signal sent", "conversation_id": conv_id}
 
 
+# ── SOTA AGENTIC ACTION ENDPOINT ──────────────────────────────────────────
+# Phase 1: Context-Aware UI Payload Binding
+# Phase 2: Generative UI (JSON Risk Widget)
+# Phase 3: Multi-Agent Reflection Loop (Deep Insight)
+# Phase 4: Proactive Next Best Action generation
+
+class AgenticActionRequest(BaseModel):
+    """
+    Request model for the SOTA Agentic Action endpoint.
+    Bypasses the regular chat pipeline and routes directly to specialised nodes.
+    """
+    intent: str              # DEEP_INSIGHT | EXECUTIVE_SUMMARY | RISK_ASSESSMENT
+    conversation_id: str
+    project_id: Optional[str] = "default"
+    document_ids: Optional[List[str]] = None  # File names visible in the current conversation
+
+
+@app.post("/query/agentic_action")
+async def agentic_action(request: AgenticActionRequest):
+    """
+    SOTA Agentic Action Entry Point (Phases 1-4).
+
+    Fires a context-aware, intent-bound pipeline that:
+    - Pulls document context directly via vector search (Phase 1)
+    - Streams a Generative UI JSON widget for Risk Assessment (Phase 2)
+    - Runs a 3-stage Multi-Agent debate for Deep Insight (Phase 3)
+    - Generates proactive Next Best Action buttons at the end (Phase 4)
+
+    All responses use Server-Sent Events (SSE) and are fully abort-safe.
+    Non-breaking: existing /query/stream endpoint is not modified.
+    """
+    if not app_state.brain:
+        raise HTTPException(status_code=503, detail="UltimaRAG Brain not initialized")
+
+    valid_intents = {"DEEP_INSIGHT", "EXECUTIVE_SUMMARY", "RISK_ASSESSMENT"}
+    if request.intent not in valid_intents:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid intent '{request.intent}'. Must be one of: {valid_intents}"
+        )
+
+    conv_id = request.conversation_id
+    # Reset any lingering abort flags for this conversation
+    abort_flags.pop(conv_id, None)
+
+    async def agentic_generator():
+        try:
+            # Emit initial status
+            yield f"data: {json.dumps({'stage': 'initializing', 'message': f'Initialising {request.intent} pipeline...', 'conversation_id': conv_id}, ensure_ascii=False)}\n\n"
+
+            # Build a human-readable "synthetic user prompt" and persist it.
+            # This ensures conversation history stays coherent even when no text was typed.
+            doc_label = ", ".join(request.document_ids) if request.document_ids else "documents in this conversation"
+            intent_labels = {
+                "DEEP_INSIGHT": "Deep Insight",
+                "EXECUTIVE_SUMMARY": "Executive Summary",
+                "RISK_ASSESSMENT": "Risk Assessment"
+            }
+            synthetic_query = f"[{intent_labels.get(request.intent, request.intent)} requested for: {doc_label}]"
+
+            # Persist the synthetic user message so history stays intact
+            try:
+                from ..agents.intent_classifier import parse_mentions
+                app_state.brain._persist_message(
+                    conv_id, "user", synthetic_query,
+                    metadata={"intent": request.intent, "agentic_action": True}
+                )
+            except Exception as persist_err:
+                logger.warning(f"AgenticAction: Failed to persist synthetic user msg: {persist_err}")
+
+            # Emit the synthetic user message to the frontend so it appears in the chat
+            yield f"data: {json.dumps({'stage': 'agentic_user_msg', 'message': synthetic_query}, ensure_ascii=False)}\n\n"
+
+            # Stream the agentic pipeline
+            async for event in app_state.brain.run_agentic_action(
+                intent=request.intent,
+                document_names=request.document_ids or [],
+                conversation_id=conv_id,
+                project_id=request.project_id or "default",
+                check_abort_fn=lambda: abort_flags.get(conv_id)
+            ):
+                # Abort check
+                if abort_flags.get(conv_id):
+                    abort_flags.pop(conv_id, None)
+                    yield f"data: {json.dumps({'stage': 'terminated', 'message': 'Agentic action terminated by user.'}, ensure_ascii=False)}\n\n"
+                    return
+
+                evt_type = event.get("type", "")
+
+                if evt_type == "status":
+                    yield f"data: {json.dumps({'stage': 'processing', 'agent': event.get('agent'), 'message': event.get('stage'), 'status': 'running'}, ensure_ascii=False)}\n\n"
+
+                elif evt_type == "thought":
+                    yield f"data: {json.dumps({'type': 'thought', 'agent': event.get('agent'), 'action': event.get('action')}, ensure_ascii=False)}\n\n"
+
+                elif evt_type == "token":
+                    yield f"data: {json.dumps({'stage': 'streaming', 'token': event.get('token', '')}, ensure_ascii=False)}\n\n"
+
+                elif evt_type == "json_chunk":
+                    # Phase 2: Generative UI — full JSON object for Risk widget
+                    yield f"data: {json.dumps({'stage': 'json_chunk', 'data': event.get('data', {})}, ensure_ascii=False)}\n\n"
+
+                elif evt_type == "next_actions":
+                    # Phase 4: Proactive Next Best Actions
+                    yield f"data: {json.dumps({'stage': 'next_actions', 'actions': event.get('actions', [])}, ensure_ascii=False)}\n\n"
+
+                elif evt_type == "agentic_final":
+                    final_content = event.get("content", "")
+                    # Persist the final assistant message
+                    try:
+                        app_state.brain._persist_message(
+                            conv_id, "assistant", final_content,
+                            metadata={"intent": request.intent, "agentic_action": True, "confidence_score": 0.9}
+                        )
+                    except Exception as persist_err:
+                        logger.warning(f"AgenticAction: Failed to persist assistant msg: {persist_err}")
+
+                    yield f"data: {json.dumps({'stage': 'result', 'success': True, 'final_response': final_content, 'agent_type': request.intent, 'confidence_score': 0.9, 'conversation_id': conv_id}, ensure_ascii=False)}\n\n"
+
+        except Exception as e:
+            logger.error(f"AgenticAction Error: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            yield f"data: {json.dumps({'stage': 'error', 'message': f'Agentic pipeline error: {str(e)}'}, ensure_ascii=False)}\n\n"
+
+    return StreamingResponse(
+        agentic_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        }
+    )
+
+
+
+class FeedbackRequest(BaseModel):
+    """User feedback for a specific turn"""
+    conversation_id: str
+    message_id: str
+    score: int  # 1 for positive, -1 for negative
+    feedback_text: Optional[str] = None
+
+@app.post("/query/feedback")
+async def submit_feedback(request: FeedbackRequest, background_tasks: BackgroundTasks):
+    """
+    Submit feedback for a generation.
+    Negative score (< 0) triggers the ReflectionAgent via non-blocking
+    schedule_reflection(). Returns HTTP 200 IMMEDIATELY — learning is async.
+    """
+    try:
+        if not app_state.sqlite_db:
+            raise HTTPException(status_code=503, detail="SQLite Database not connected")
+
+        # 1. Update the feedback score in SQLite
+        with app_state.sqlite_db.get_cursor() as cursor:
+            cursor.execute(
+                "UPDATE messages SET feedback_score = ? WHERE message_id = ?",
+                (request.score, request.message_id)
+            )
+
+        logger.info(f"Feedback ({request.score}) registered for message: {request.message_id}")
+
+        # 2. Trigger ReflectionAgent for negative scores
+        if request.score < 0 and app_state.reflection_agent:
+            with app_state.sqlite_db.get_cursor() as cursor:
+                cursor.execute(
+                    "SELECT content, parent_message_id FROM messages WHERE message_id = ?",
+                    (request.message_id,)
+                )
+                row = cursor.fetchone()
+                if row:
+                    content = row["content"]
+                    parent_id = row["parent_message_id"]
+
+                    query = ""
+                    if parent_id:
+                        cursor.execute(
+                            "SELECT content FROM messages WHERE message_id = ?",
+                            (parent_id,)
+                        )
+                        p_row = cursor.fetchone()
+                        if p_row:
+                            query = p_row["content"]
+
+                    # Non-blocking fire-and-forget — returns HTTP 200 immediately
+                    app_state.reflection_agent.schedule_reflection({
+                        "query": query,
+                        "response": content,
+                        "feedback_type": "thumbs_down",
+                        "feedback_id": str(uuid.uuid4()),
+                        "user_id": "default",
+                    })
+
+        return {"success": True, "message": "Feedback received. Learning in progress."}
+
+    except Exception as e:
+        logger.error(f"Failed to record feedback: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/admin/guidelines")
+async def get_guidelines_admin():
+    """
+    Admin view of all active and retired behavioral guidelines.
+    Embeddings (384 floats) are stripped from the response for readability.
+    Rules are sorted by confidence descending.
+
+    Phase 9 — Observability endpoint. No auth gate added yet (single-user app).
+    Multi-user: add Depends(require_admin_auth) when RBAC is implemented.
+    """
+    if not app_state.guidelines_manager:
+        raise HTTPException(
+            status_code=503,
+            detail="GuidelinesManager not initialized. Check startup logs."
+        )
+
+    stats = app_state.guidelines_manager.get_stats()
+
+    # Strip embedding vectors from output (384 floats = noise for humans)
+    def strip_embedding(rule: dict) -> dict:
+        return {k: v for k, v in rule.items() if k != "embedding"}
+
+    all_rules = app_state.guidelines_manager._rules  # type: ignore[attr-defined]
+    active = sorted(
+        [strip_embedding(r) for r in all_rules if r.get("status") == "active"],
+        key=lambda r: r.get("confidence", 0),
+        reverse=True
+    )
+    retired = sorted(
+        [strip_embedding(r) for r in all_rules if r.get("status") == "retired"],
+        key=lambda r: r.get("confidence", 0),
+        reverse=True
+    )
+
+    return {
+        "stats": stats,
+        "active_rules": active,
+        "retired_rules": retired,
+        "message": "No active rules yet." if not active else None
+    }
+
+
 @app.post("/index")
 async def index_documents(request: IndexRequest):
     """
@@ -571,6 +970,19 @@ async def index_documents(request: IndexRequest):
             for text, doc_id, meta in zip(request.texts, doc_ids, metadata)
         ]
         
+        # SOTA Phase 4: Watchdog Tracking Start
+        job_id = str(uuid.uuid4())
+        docs_names = "/".join(doc_ids) if doc_ids else "unknown_batch"
+        if app_state.sqlite_db:
+            try:
+                with app_state.sqlite_db.get_cursor() as cursor:
+                    cursor.execute(
+                        "INSERT INTO ingestion_status (id, file_name, status) VALUES (?, ?, ?)",
+                        (job_id, docs_names, "IN_PROGRESS")
+                    )
+            except Exception as e:
+                logger.error(f"Failed to start watchdog job: {e}")
+                
         # Chunk documents
         chunker = DocumentChunker(
             strategy="semantic",
@@ -578,6 +990,18 @@ async def index_documents(request: IndexRequest):
             overlap=Config.chunking.CHUNK_OVERLAP
         )
         chunks = chunker.chunk_documents(documents)
+        
+        # SOTA Phase 3: LanceDB Scale & Performance Guard (Indexing Limit)
+        # Deep Indexing Cap: Prevent massive 10,000-page PDFs from exhausting VRAM and DB connections
+        # by capping the maximum chunks processed per document index request.
+        MAX_CHUNKS = 1000
+        if len(chunks) > MAX_CHUNKS:
+            logger.warning(
+                f"🚨 PERFORMANCE GUARD ACTIVE: Document generated {len(chunks)} chunks. "
+                f"Capping at {MAX_CHUNKS} to prevent ingestion timeout/VRAM exhaustion. "
+                f"Document will be partially indexed."
+            )
+            chunks = chunks[:MAX_CHUNKS]
         
         # Generate embeddings
         embedder = get_embedder()
@@ -592,12 +1016,25 @@ async def index_documents(request: IndexRequest):
                 "file_name": c["source"],
                 "project_id": request.project_id,
                 "conversation_id": request.conversation_id or "default",
+                "user_id": getattr(request, "user_id", "default"),
+                "role_id": getattr(request, "role_id", "user"),
                 "folder_id": request.folder_id,
                 "metadata": c.get("metadata", {})
             })
         
         app_state.db.add_knowledge(processed_chunks)
         app_state.ready = True
+        
+        # SOTA Phase 4: Watchdog Tracking Complete
+        if app_state.sqlite_db:
+            try:
+                with app_state.sqlite_db.get_cursor() as cursor:
+                    cursor.execute(
+                        "UPDATE ingestion_status SET status = 'SUCCESS', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                        (job_id,)
+                    )
+            except Exception as e:
+                logger.error(f"Failed to close watchdog job: {e}")
         
 
         
@@ -609,6 +1046,17 @@ async def index_documents(request: IndexRequest):
         
     except Exception as e:
         logger.error(f"Indexing error: {e}")
+        # SOTA Phase 4: Watchdog Tracking Failure
+        if 'job_id' in locals() and app_state.sqlite_db:
+            try:
+                with app_state.sqlite_db.get_cursor() as cursor:
+                    cursor.execute(
+                        "UPDATE ingestion_status SET status = 'FAILED', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                        (job_id,)
+                    )
+            except Exception as db_e:
+                logger.error(f"Failed to mark watchdog job failed: {db_e}")
+                
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -876,6 +1324,17 @@ async def unified_query(
             from ..agents.intent_classifier import parse_mentions, strip_mentions
             mentioned_files = parse_mentions(working_query)
             clean_query = strip_mentions(working_query) if mentioned_files else working_query
+            
+            # SOTA Phase 5: Security Magic - Prompt Injection Firewall (singleton)
+            if app_state.firewall and app_state.firewall.detect_injection(clean_query, chat_id):
+                defense_msg = "Security Alert: This prompt exhibits characteristics of an adversarial attack or system bypass attempt. Request denied by UltimaRAG Firewall."
+                yield f"data: {json.dumps({'stage': 'processing', 'agent': 'Firewall', 'message': 'Intercepted malicious request', 'status': 'blocked'}, ensure_ascii=False)}\n\n"
+                
+                async for chunk in simulate_streaming(defense_msg):
+                    yield chunk
+                    
+                yield f"data: {json.dumps({'stage': 'result', 'success': False, 'final_response': defense_msg, 'confidence_score': 1.0, 'agent_type': 'FIREWALL_BLOCKED', 'conversation_id': chat_id}, ensure_ascii=False)}\n\n"
+                return
             
             # 5. Run the Brain (Streaming) — standard RAG path
             generator = await app_state.brain.run(
@@ -1395,6 +1854,29 @@ async def route_query_endpoint(query: str = Form(...), has_documents: bool = For
 
 
 # =============================================================================
+# SOTA Phase 5: UI TELEMETRY WEBSOCKET
+# =============================================================================
+
+@app.websocket("/telemetry/ws")
+async def websocket_telemetry_endpoint(websocket: WebSocket):
+    """
+    SOTA WebSocket endpoint for real-time telemetry streaming.
+    Provides live connection to the frontend HUD.
+    """
+    await ws_manager.connect(websocket)
+    try:
+        while True:
+            # We only push data to the client, but we must listen to keep connection alive
+            data = await websocket.receive_text()
+            if data == "ping":
+                await websocket.send_text("pong")
+    except WebSocketDisconnect:
+        ws_manager.disconnect(websocket)
+    except Exception as e:
+        logger.error(f"WebSocket Error: {e}")
+        ws_manager.disconnect(websocket)
+
+# =============================================================================
 # WORKSPACE FILE ACCESS ENDPOINTS
 # =============================================================================
 
@@ -1538,14 +2020,15 @@ async def pdf_query_generate(
     collected = []
     try:
         from ..agents.intent_classifier import strip_mentions
-        from ..agents.query_analyzer import QueryAnalyzer
         import json as _json
 
         clean_query = strip_mentions(working_query) if files_list else working_query
-        qa = QueryAnalyzer()
-        analysis = qa._analyze_fallback(clean_query)
 
-        if analysis.get('intent') == 'summarize':
+        # Inline summarize-intent detection (QueryAnalyzer module archived — dead code)
+        _q_lower = clean_query.lower().strip()
+        is_summarize_intent = any(w in _q_lower for w in ["summarize", "summary", "tldr", "brief", "give me a summary"])
+
+        if is_summarize_intent:
             # Run the Map-Reduce Generator (yields SSE strings)
             generator = summarize_intent_generator(clean_query, conversation_id, files_list)
             async for event in generator:

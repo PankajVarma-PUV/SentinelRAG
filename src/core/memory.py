@@ -21,7 +21,7 @@ from .config import Config
 from .utils import logger
 
 # ---------------------------------------------------------------------------
-# MemGPT Token Budget Constants (Gemma3:12b = 2048 total context)
+# MemGPT Token Budget Constants (Gemma3:4b = 2048 total context)
 # ---------------------------------------------------------------------------
 # We reserve 80% of the input window for active history.
 # The remaining 20% is reserved for system prompt + RAG chunks.
@@ -34,7 +34,7 @@ class MemoryManager:
     """
     UltimaRAG Memory Manager (MemGPT implementation).
     Controls the 'Virtual Context' by paging messages in and out of the LLM window.
-    Tuned for Gemma3:12b with a 2048-token total context window.
+    Tuned for Gemma3:4b with a 2048-token total context window.
     """
 
     def __init__(self, db: UltimaRAGDatabase):
@@ -109,7 +109,7 @@ class MemoryManager:
     async def manage_overflow(self, conversation_id: str):
         """
         MemGPT Resource Guard: Called before every LLM request.
-        Checks if the active context window exceeds the threshold for Gemma3:12b.
+        Checks if the active context window exceeds the threshold for Gemma3:4b.
         If so, summarizes and pages out the oldest turn (User + Assistant pair).
         This is the core of the MemGPT paging mechanism.
         """
@@ -138,7 +138,7 @@ class MemoryManager:
         summary = await self._summarize_turn(turn_to_page)
 
         if msgs_to_page:
-            self.db.page_out_messages(msgs_to_page)
+            self.db.page_out_messages(msgs_to_page, conversation_id, summary, token_count=current_tokens)
             logger.info(f"✅ MemGPT: Paged out 1 oldest turn. Summary: '{summary[:80]}...'")
 
     async def _summarize_turn(self, turn: List[Dict]) -> str:
@@ -168,9 +168,9 @@ Turn:
 Summary:"""
 
         try:
-            # Use env-driven token cap (default: 128)
-            result = await asyncio.to_thread(
-                client.generate, prompt,
+            # Native async generation using httpx
+            result = await client.generate(
+                prompt,
                 temperature=0.0,
                 max_tokens=Config.memgpt.SUMMARY_MAX_TOKENS
             )
@@ -190,12 +190,96 @@ Summary:"""
         # Format for inclusion in prompt
         recalled_context = []
         for r in results:
-            if r['state'] == 'PAGED': # Only count things NOT in current window
+            if r.get('state') == 'PAGED': # Only count things NOT in current window
                 recalled_context.append({
-                    "role": r['role'],
-                    "content": r['content'],
+                    "role": r.get('role', 'system'),
+                    "content": r.get('content', ''),
                     "recalled": True
                 })
         
         return recalled_context
+
+    async def extract_facts(self, conversation_id: str, new_messages: List[Dict]):
+        """
+        Tier 2 Semantic Distillation (Fact Extraction Sub-Agent).
+        Reads new User/Assistant messages and extracts immutable facts about the user or project
+        to be stored in the 'knowledge_distillation' table for permanent recall.
+        Runs asynchronously in the background.
+        """
+        if not new_messages:
+            return
+
+        from .ollama_client import OllamaClient
+        import json
+        import uuid
+        
+        # Use the fast, distilled model for fact extraction if configured
+        client = OllamaClient(model_name=Config.ollama.MODEL_NAME)
+        
+        # Combine new messages
+        conversation_block = ""
+        for msg in new_messages:
+            role = msg.get("role", "unknown").upper()
+            content = msg.get("content", "")
+            conversation_block += f"{role}: {content}\n"
+            
+        system_prompt = """
+You are a Background Memory Extraction Agent.
+Your goal is to extract permanent, immutable facts about the User, their Preferences, or the Project context from the provided conversation snippet.
+Examples of facts:
+- "User is building a React Native app"
+- "User prefers Python for backend scripting"
+- "The main server IP is 192.168.1.50"
+
+Output a strictly valid JSON array of facts.
+Format:
+[
+  {"fact": "Extracted string", "domain": "user_preference|project_context", "confidence": 0.95}
+]
+If no concrete facts are found, output an empty array: []
+"""
+        user_prompt = f"Analyze this conversation:\n\n{conversation_block}\n\nExtract facts as JSON."
+        
+        try:
+            # We use the new async generator with JSON format constraint
+            result = await client.generate(
+                prompt=user_prompt,
+                system=system_prompt,
+                temperature=0.0,
+                format="json"
+            )
+            
+            response_text = result.get("response", "[]") if isinstance(result, dict) else result
+            
+            try:
+                facts = json.loads(response_text)
+                if not isinstance(facts, list):
+                    facts = [facts]
+            except json.JSONDecodeError:
+                logger.warning(f"Fact Extraction Sub-Agent failed to parse JSON: {response_text[:100]}")
+                return
+                
+            if facts:
+                # Store extracted facts in the database
+                for fact in facts:
+                    if not isinstance(fact, dict) or "fact" not in fact:
+                        continue
+                        
+                    metric_fact = fact.get("fact", "")
+                    domain = fact.get("domain", "general")
+                    confidence = float(fact.get("confidence", 0.5))
+                    
+                    if len(metric_fact) > 5 and confidence > 0.6:
+                        self.db.conn.open_table("knowledge_distillation").add([{
+                            "id": str(uuid.uuid4()),
+                            "conversation_id": conversation_id,
+                            "extracted_fact": metric_fact,
+                            "domain": domain,
+                            "confidence": confidence,
+                            "created_at": datetime.utcnow().isoformat()
+                        }])
+                logger.info(f"✅ Extracted {len(facts)} permanent facts into Knowledge Distillation layer.")
+                
+        except Exception as e:
+            logger.error(f"Fact Extraction Sub-Agent Error: {e}")
 

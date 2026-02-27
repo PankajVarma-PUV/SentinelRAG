@@ -232,16 +232,18 @@ List any specific factual errors found. Use clean JSON.
 <output_format>
 {{
     "thinking": "Concise audit of claims vs sources.",
-    "accuracy_score": 0.0-1.0,
+    "accuracy_score": 0.0,
     "reflection": {{
-        "is_relevant": true/false,
-        "is_supported": true/false,
-        "has_utility": true/false
+        "is_relevant": true,
+        "is_supported": true,
+        "has_utility": true
     }},
     "factual_errors": ["list errors"],
-    "is_accurate": true/false
+    "is_accurate": true
 }}
 </output_format>
+
+OUTPUT ONLY THE JSON.
 """
 
 

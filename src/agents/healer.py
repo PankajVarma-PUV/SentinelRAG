@@ -71,12 +71,17 @@ Detected Discrepancies: {", ".join(gaps)}
 UltimaRAG REWRITTEN RESPONSE:"""
         
         try:
-            # OllamaClient.generate() is synchronous — run in thread to avoid blocking
+            # Native Async Generation using httpx client
             logger.info(f"Healer generating correction with prompt length: {len(prompt)} characters")
-            response = await asyncio.to_thread(self.llm.generate, prompt)
+            # SOTA Phase 4: Utilize dynamic model fallback natively
+            response = await self.llm.generate(prompt)
             
             # SOTA: Strip <thinking> tags from final response
             if response:
+                # Handle dictionary response from new Async client
+                if isinstance(response, dict):
+                    response = response.get("response", "")
+                
                 clean_response = re.sub(r'<thinking>[\s\S]*?</thinking>', '', response).strip()
             else:
                 clean_response = flawed_response
@@ -85,7 +90,7 @@ UltimaRAG REWRITTEN RESPONSE:"""
             reasoning = f"Corrected response to address gaps: {', '.join(gaps)} using provided evidence."
             return corrected, reasoning
         except Exception as e:
-            logger.error(f"Healing Error: {e}")
+            logger.error(f"🚨 SOTA Watchdog: Healer generation critically failed: {e}. Returning original flawed response.")
             return flawed_response, f"Healing failed due to error: {e}"
 
 

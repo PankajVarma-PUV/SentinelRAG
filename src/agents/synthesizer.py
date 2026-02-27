@@ -60,7 +60,7 @@ class SynthesizerAgent:
         else:
             logger.info(f"SynthesisAgent initialized with Ollama: {model}")
     
-    def synthesize(
+    async def synthesize(
         self,
         query: str,
         chunks: List[Dict],
@@ -91,8 +91,30 @@ class SynthesizerAgent:
         is_multimodal = has_mm_summary or has_mm_raw
         
         with Timer("Synthesis"):
+            # SOTA Phase 3: Parent-Child Context Strategy
+            # When chunks from the same document are retrieved, we fuse them sequentially
+            # into logical "Parent Documents" instead of fragmented bullets, providing
+            # massive boosts to LLM reasoning over continuous text.
+            grouped_chunks = {}
+            for c in chunks:
+                src = c.get('metadata', {}).get('file_name', c.get('source', 'Context'))
+                if src not in grouped_chunks:
+                    grouped_chunks[src] = []
+                grouped_chunks[src].append(c)
+                
+            formatted_fused_chunks = []
+            for src, doc_chunks in grouped_chunks.items():
+                # Sort by chunk index if available to reconstruct narrative flow
+                doc_chunks.sort(key=lambda x: x.get('metadata', {}).get('chunk_index', 0))
+                doc_text = f"\n--- SOURCE: {src} ---\n"
+                doc_text += "\n...\n".join([c.get('text', '') for c in doc_chunks])
+                formatted_fused_chunks.append({"source": src, "text": doc_text, "metadata": doc_chunks[0].get('metadata', {})})
+                
+            # Replace chunks with the fused parent-child representations
+            chunks_to_format = formatted_fused_chunks if formatted_fused_chunks else chunks
+
             # Format context
-            context = format_context_for_synthesis(chunks)
+            context = format_context_for_synthesis(chunks_to_format)
             
             # Select model and prompt
             model = Config.ollama_multi_model.AGENT_MODELS.get("synthesizer", OllamaConfig.MODEL_NAME)
@@ -115,7 +137,7 @@ class SynthesizerAgent:
                 # Use a specific model if needed
                 client = self.client if model == OllamaConfig.MODEL_NAME else OllamaClient(model_name=model)
                 
-                response_text = client.generate(
+                response_text = await client.generate(
                     prompt,
                     temperature=0.2 if is_multimodal else OllamaConfig.TEMPERATURE,
                     max_tokens=Config.ollama_multi_model.HEAVY_MAX_TOKENS,
@@ -134,7 +156,13 @@ class SynthesizerAgent:
                     "metadata": {"error": str(e)}
                 }
             
-            response_text = response_text.strip()
+            # Handle AsyncGenerator vs str response
+            if isinstance(response_text, dict):
+                response_text = response_text.get("response", "").strip()
+            elif hasattr(response_text, "strip"):
+                response_text = response_text.strip()
+            else:
+                response_text = str(response_text)
         
         # Parse response
         result = self._parse_response(response_text, chunks)
@@ -321,11 +349,11 @@ def get_synthesizer() -> SynthesizerAgent:
     return SynthesizerAgent()
 
 
-def synthesize_answer(
+async def synthesize_answer(
     query: str,
     chunks: List[Dict]
 ) -> Dict:
     """Convenience function to synthesize an answer"""
     synthesizer = get_synthesizer()
-    return synthesizer.synthesize(query, chunks)
+    return await synthesizer.synthesize(query, chunks)
 

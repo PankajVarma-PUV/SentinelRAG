@@ -49,11 +49,11 @@ from .utils import logger
 class OllamaConfig:
     """
     Configuration for LLM Provider (Default: Ollama).
-    All values are loaded from .env — safe defaults tuned for Gemma3:12b on 6GB VRAM.
+    All values are loaded from .env — safe defaults tuned for Gemma3:4b on 6GB VRAM.
     """
     # Connection
     BASE_URL: str = os.getenv("LLM_BASE_URL", os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"))
-    MODEL_NAME: str = os.getenv("MODEL_NAME", "gemma3:12b")
+    MODEL_NAME: str = os.getenv("MODEL_NAME", "gemma3:4b")
 
     # Provider
     PROVIDER: str = os.getenv("LLM_PROVIDER", "ollama")
@@ -62,7 +62,7 @@ class OllamaConfig:
     # -------------------------------------------------------------------------
     # Context Window Budget
     # These are the MASTER limits — all other token caps derive from these.
-    # Gemma3:12b default: 2048 total context (input + output combined)
+    # Gemma3:4b default: 2048 total context (input + output combined)
     # A100 / RTX4090 example: MAX_INPUT_TOKENS=32768, MAX_OUTPUT_TOKENS=4096
     # -------------------------------------------------------------------------
     MAX_INPUT_TOKENS: int = int(os.getenv("MAX_INPUT_TOKENS", "2048"))
@@ -88,7 +88,7 @@ class OllamaMultiModelConfig:
       RTX 3090 / 4090:  LIGHTWEIGHT_MAX_TOKENS=1024, HEAVY_MAX_TOKENS=2048
       A100 / H100:      LIGHTWEIGHT_MAX_TOKENS=2048, HEAVY_MAX_TOKENS=4096
     """
-    target_model: str = os.getenv("MODEL_NAME", "gemma3:12b")
+    target_model: str = os.getenv("MODEL_NAME", "gemma3:4b")
 
     # Lightweight model (intent classification, query analysis, humanization)
     LIGHTWEIGHT_MODEL: str = os.getenv("LIGHTWEIGHT_MODEL", target_model)
@@ -158,7 +158,7 @@ class RetrievalConfig:
       RETRIEVAL_HYBRID_ALPHA  — weight for dense vs sparse, 1.0 = pure dense (default: 0.7)
       RETRIEVAL_MMR_LAMBDA    — diversity weight in MMR, 1.0 = pure relevance (default: 0.5)
       RETRIEVAL_FINAL_TOP_K   — chunks sent to LLM after reranking (default: 3)
-                                Gemma3:12b: keep at 3. RTX4090: 8–10. A100+: 15–20
+                                Gemma3:4b: keep at 3. RTX4090: 8–10. A100+: 15–20
       RETRIEVAL_MIN_SCORE     — minimum similarity score to include a chunk (default: 0.3)
     """
     DENSE_TOP_K: int = int(os.getenv("RETRIEVAL_DENSE_TOP_K", "50"))
@@ -210,6 +210,55 @@ class RefusalGateConfig:
     MIN_SYNTHESIS_CONFIDENCE: float = float(os.getenv("REFUSAL_MIN_SYNTHESIS_CONF", "0.6"))
 
 
+class ContinuousLearningConfig:
+    """
+    Configuration for the continuous learning loop.
+
+    PRIMARY_OLLAMA_MODEL is the single source of truth for which Ollama model
+    is used for LLM inference (chat, completion, reflection). Model size (4B or 8B)
+    is AUTO-DERIVED from this name via detect_model_size() — never set it manually.
+
+    ENV keys:
+      PRIMARY_OLLAMA_MODEL          — main Ollama model name (default: MODEL_NAME)
+      GUIDELINES_PATH               — path to JSON rules file (default: data/system_guidelines.json)
+      GUIDELINES_CACHE_TTL          — mtime-check interval in seconds (default: 60)
+      GUIDELINES_TOKEN_BUDGET       — hard max tokens for guideline injection (default: 150)
+      EMBEDDING_MODEL_NAME          — HuggingFace model for dedup embeddings (default: all-MiniLM-L6-v2)
+      EMBEDDING_SIMILARITY_THRESHOLD — cosine sim threshold for dedup (default: 0.82)
+      REFLECTION_MIN_QUERY_LEN      — min query chars to trigger reflection (default: 10)
+      REFLECTION_MIN_RESPONSE_LEN   — min response chars to trigger reflection (default: 20)
+      REFLECTION_MIN_CONFIDENCE     — min LLM confidence in generated rule (default: 0.3)
+    """
+    # Ollama model — SINGLE source of truth; model_size is derived, never set manually
+    PRIMARY_OLLAMA_MODEL: str = os.getenv("PRIMARY_OLLAMA_MODEL",
+                                          os.getenv("MODEL_NAME", "gemma3:4b"))
+
+    # Guidelines file path (relative to project root or absolute)
+    GUIDELINES_PATH: str = os.getenv(
+        "GUIDELINES_PATH",
+        str(Path(__file__).parent.parent.parent / "data" / "system_guidelines.json")
+    )
+
+    # How often GuidelinesManager checks file mtime for changes (seconds)
+    GUIDELINES_CACHE_TTL: int = int(os.getenv("GUIDELINES_CACHE_TTL", "60"))
+
+    # Hard token budget for guideline injection into prompts (do not increase for local models)
+    GUIDELINES_TOKEN_BUDGET: int = int(os.getenv("GUIDELINES_TOKEN_BUDGET", "150"))
+
+    # HuggingFace embedding model: CPU-only, runs in venv, NOT via Ollama
+    EMBEDDING_MODEL_NAME: str = os.getenv("EMBEDDING_MODEL_NAME", "all-MiniLM-L6-v2")
+
+    # Cosine similarity threshold for near-duplicate rule detection
+    # 0.82 = very similar; lower = more aggressive dedup
+    EMBEDDING_SIMILARITY_THRESHOLD: float = float(
+        os.getenv("EMBEDDING_SIMILARITY_THRESHOLD", "0.82"))
+
+    # Quality gates for triggering reflection
+    REFLECTION_MIN_QUERY_LEN: int = int(os.getenv("REFLECTION_MIN_QUERY_LEN", "10"))
+    REFLECTION_MIN_RESPONSE_LEN: int = int(os.getenv("REFLECTION_MIN_RESPONSE_LEN", "20"))
+    REFLECTION_MIN_CONFIDENCE: float = float(os.getenv("REFLECTION_MIN_CONFIDENCE", "0.3"))
+
+
 
 # SynthesisConfig has been intentionally REMOVED.
 # The iterative continuation loop (CONTINUE_PROMPT / MAX_CONTINUATION_LOOPS)
@@ -256,7 +305,7 @@ class ChunkingConfig:
       CHUNK_MAX_SIZE    — hard guardrail, never exceed this (default: 1000)
 
     Hardware upgrade guide:
-      Gemma3:12b (2048 ctx):   CHUNK_SIZE=500,  CHUNK_OVERLAP=100, CHUNK_MAX_SIZE=1000
+      Gemma3:4b (2048 ctx):   CHUNK_SIZE=500,  CHUNK_OVERLAP=100, CHUNK_MAX_SIZE=1000
       RTX 4090  (8192 ctx):   CHUNK_SIZE=1000, CHUNK_OVERLAP=150, CHUNK_MAX_SIZE=2000
       A100      (32768 ctx):  CHUNK_SIZE=2000, CHUNK_OVERLAP=200, CHUNK_MAX_SIZE=4000
     """
@@ -314,6 +363,7 @@ class PathConfig:
     INDEXES_DIR: Path = MODELS_DIR / "indexes"
     CACHE_DIR: Path = BASE_DIR / "cache"
     Ultima_DB_DIR: Path = DATA_DIR / "Ultima_db"
+    STORAGE_DIR: Path = DATA_DIR  # Used by ReflectionAgent for system_guidelines.json
 
     @classmethod
     def ensure_dirs(cls):
@@ -348,6 +398,7 @@ class Config:
     paths = PathConfig
     ollama_multi_model = OllamaMultiModelConfig
     memgpt = MemGPTConfig
+    learning = ContinuousLearningConfig
     # synthesis config removed — continuation loop was deprecated.
 
     @classmethod

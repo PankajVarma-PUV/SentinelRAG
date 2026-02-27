@@ -57,7 +57,8 @@ class RetrieverAgent:
         file_names: Optional[List[str]] = None,
         top_k: Optional[int] = None,
         include_multimodal: bool = True,
-        conversation_id: str = "default"
+        conversation_id: str = "default",
+        user_id: str = "default"
     ) -> Dict:
         """
         Execute unified retrieval for a query, with SOTA Reranking.
@@ -82,6 +83,7 @@ class RetrieverAgent:
                 project_id=project_id,
                 conversation_id=conversation_id,
                 file_names=file_names,
+                user_id=user_id,
                 limit=initial_pool
             )
             

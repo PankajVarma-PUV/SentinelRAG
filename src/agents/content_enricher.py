@@ -142,16 +142,14 @@ class ContentEnricher:
         
         with Timer(f"Content Enrichment ({file_name})"):
             try:
-                # SOTA: Use asyncio.to_thread to prevent blocking the event loop
-                # OllamaClient.generate is a synchronous HTTP call (requests.post).
-                # Wrapping it ensures the FastAPI server remains responsive during inference.
-                import asyncio
-                enriched = await asyncio.to_thread(
-                    self.client.generate,
+                # SOTA: OllamaClient is native async HTTPX now
+                result = await self.client.generate(
                     prompt, 
                     temperature=0.4, 
                     max_tokens=Config.ollama_multi_model.HEAVY_MAX_TOKENS
                 )
+                
+                enriched = result.get("response", "") if isinstance(result, dict) else result
                 
                 if not enriched or len(enriched.strip()) < 10:
                     logger.warning("Enrichment produced empty result. Falling back to raw.")

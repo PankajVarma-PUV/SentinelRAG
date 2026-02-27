@@ -29,6 +29,7 @@ class Intent(str, Enum):
     PERCEPTION = "multimodal_analysis" # Image/Video analysis
     MULTI_TASK = "chained_agents" # Multi-step logic
     HISTORY = "history_recall" # Conversation history reasoning
+    WEB_SEARCH = "web_search" # Adaptive web breakout
 
 class VirtualContext(BaseModel):
     active_memory: str = Field(..., description="Currently loaded context in LLM RAM")

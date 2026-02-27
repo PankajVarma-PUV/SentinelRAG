@@ -104,6 +104,7 @@ You are the UltimaRAG Wise Intent Router. Classify inquiries into the most effic
 - PERCEPTION: Inquiries about visual/audio assets (images, videos).
 - MULTI_TASK: Complex requests involving multiple distinct actions (e.g., "Summarize this PDF and translate the first page").
 - HISTORY: Requests for conversational recall or timeline summaries.
+- WEB_SEARCH: Queries asking for current events, news, or things unlikely to be in internal documents.
 </taxonomy>
 
 <user_input>
@@ -121,6 +122,9 @@ INTENT JSON:"""
             # SOTA: Using ainvoke for parallel agentic performance
             response_raw = await self.llm.ainvoke(prompt)
             result_text = response_raw.strip()
+            
+            # SOTA: Defensively strip <think> reasoning blocks before parsing JSON
+            result_text = re.sub(r'<think>[\s\S]*?</think>', '', result_text, flags=re.IGNORECASE).strip()
             
             # Clean JSON
             if "```" in result_text:
@@ -141,6 +145,7 @@ INTENT JSON:"""
             elif "RAG" in intent_str: intent = Intent.RAG
             elif "MULTI" in intent_str: intent = Intent.MULTI_TASK
             elif "HISTORY" in intent_str: intent = Intent.HISTORY
+            elif "WEB" in intent_str: intent = Intent.WEB_SEARCH
             
             logger.info(f"Wise Intent Routing: {intent} (Confidence: {confidence:.2f})")
             return intent, target_language
@@ -166,4 +171,56 @@ INTENT JSON:"""
                 logger.info(f"Intent: Explicit context rejection detected in query: '{query}'")
                 return True
         return False
+
+class PromptFirewall:
+    """
+    SOTA Prompt Injection Firewall.
+    Uses heuristic and zero-shot pattern matching to detect adversarial attacks,
+    jailbreak attempts, and system prompt extraction.
+    """
+    
+    def __init__(self):
+        # Known malicious command vectors
+        self.blacklist_patterns = [
+            r"(?i)ignore\s*all\s*previous\s*(instructions|commands|directions)",
+            r"(?i)you\s*are\s*now\s*a\s*(bypassed|unrestricted|god|admin)\s*(ai|model)",
+            r"(?i)system\s*prompt\s*(reveal|show|print|output)",
+            r"(?i)forget\s*your\s*rules",
+            r"(?i)disregard\s*the\s*above",
+            r"(?i)\bDAN\b\s*\(Do\s*Anything\s*Now\)",
+            r"(?i)print\s*(your|the)\s*(initial|system)\s*prompt"
+        ]
+        
+    def detect_injection(self, query: str, conversation_id: str = "default") -> bool:
+        """
+        Fast local heuristic check for Prompt Injections.
+        Returns True if an injection attack is detected.
+        """
+        for pattern in self.blacklist_patterns:
+            if re.search(pattern, query):
+                logger.warning(f"🚨 SOTA Security: Prompt Injection Detected! Vector: {pattern}")
+                self._log_security_event(query, f"Pattern match: {pattern}", conversation_id)
+                return True
+                
+        # Hard cap on query length to prevent denial-of-service via massive context flooding
+        if len(query) > 5000:
+            logger.warning(f"🚨 SOTA Security: Query length exceeded threshold ({len(query)} > 5000 chars). Possible buffer flooding attack.")
+            self._log_security_event(query, "Buffer flooding attempt (len > 5000)", conversation_id)
+            return True
+            
+        return False
+
+    def _log_security_event(self, query: str, threat: str, conversation_id: str):
+        try:
+            from ..data.database import get_database
+            import uuid
+            db = get_database()
+            if db and db.is_connected():
+                with db.get_cursor() as cursor:
+                    cursor.execute(
+                        "INSERT INTO security_logs (id, conversation_id, raw_payload, threat_vector) VALUES (?, ?, ?, ?)",
+                        (str(uuid.uuid4()), conversation_id, query, threat)
+                    )
+        except Exception as e:
+            logger.error(f"Failed to log security event: {e}")
 

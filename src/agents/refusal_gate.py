@@ -15,9 +15,9 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-Refusal Gate Agent for UltimaRAG
-Now operates as a Quality Indicator agent - always returns answers with confidence scores.
-Changed from "reject policy" to "always show with fact score" policy.
+Quality Indicator Agent for UltimaRAG (formerly named Refusal Gate)
+Always returns answers with confidence scores and quality warnings.
+Operated under "Show everything, be transparent about confidence" policy.
 """
 
 from typing import Dict, List, Optional
@@ -40,23 +40,22 @@ class ConfidenceLevel:
 
 
 # =============================================================================
-# REFUSAL GATE AGENT (Now Quality Indicator)
+# QUALITY INDICATOR AGENT
 # =============================================================================
 
-class RefusalGate:
+class QualityIndicator:
     """
-    Agent 6: Quality Indicator (formerly Refusal Gate)
-    
-    Changed Behavior:
-    - Previously: Would BLOCK responses below thresholds
-    - Now: ALWAYS returns responses with quality indicators
-    
+    Agent 14: Quality Indicator — Transparency Gate
+
+    Always returns responses with confidence scores and quality metadata.
+    Never blocks responses. Attaches HIGH/MEDIUM/LOW/VERY_LOW fidelity badge.
+
     Responsibilities:
     - Classify response confidence level (HIGH/MEDIUM/LOW/VERY_LOW)
     - Generate quality warnings for transparency
     - Always return the answer with fact score
     - Suggest alternative queries if quality is low
-    
+
     Philosophy: "Show everything, but be transparent about confidence."
     """
     
@@ -80,7 +79,7 @@ class RefusalGate:
         self.low_threshold = low_confidence_threshold
         
         logger.info(
-            f"RefusalGate initialized (always-show mode): "
+            f"QualityIndicator initialized (always-show mode): "
             f"thresholds=[{high_confidence_threshold}, {medium_confidence_threshold}, {low_confidence_threshold}]"
         )
     
@@ -292,16 +291,16 @@ class RefusalGate:
         return suggestions[:3]
 
 
-# =============================================================================
-# CONVENIENCE FUNCTIONS
-# =============================================================================
+# Backward-compatible alias: existing imports of RefusalGate still work unchanged.
+RefusalGate = QualityIndicator
+
 
 def get_refusal_gate(
     high_threshold: Optional[float] = None,
     medium_threshold: Optional[float] = None,
     low_threshold: Optional[float] = None
-) -> RefusalGate:
-    """Get a configured RefusalGate (Quality Indicator) instance"""
+) -> QualityIndicator:
+    """Get a configured QualityIndicator instance (backward-compat: also accessible as RefusalGate)"""
     return RefusalGate(
         high_confidence_threshold=high_threshold or RefusalGateConfig.HIGH_CONFIDENCE_THRESHOLD,
         medium_confidence_threshold=medium_threshold or RefusalGateConfig.MEDIUM_CONFIDENCE_THRESHOLD,

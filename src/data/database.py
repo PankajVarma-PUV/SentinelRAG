@@ -244,6 +244,7 @@ class SQLiteDatabase(BaseDatabase):
             metadata_json           TEXT,
             token_count             INTEGER,
             duplicate_count         INTEGER DEFAULT 0,
+            feedback_score          INTEGER DEFAULT NULL,
             message_created_at      TEXT DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (conversation_id) REFERENCES conversations(conversation_id) ON DELETE CASCADE,
             FOREIGN KEY (parent_message_id) REFERENCES messages(message_id) ON DELETE CASCADE
@@ -251,6 +252,54 @@ class SQLiteDatabase(BaseDatabase):
         
         CREATE INDEX IF NOT EXISTS idx_messages_conversation 
             ON messages(conversation_id, message_created_at);
+            
+        -- Phase 2: Infinite Chat Memory Archives
+        CREATE TABLE IF NOT EXISTS conversation_archives (
+            archive_id              TEXT PRIMARY KEY,
+            conversation_id         TEXT NOT NULL,
+            chunk_index             INTEGER NOT NULL,
+            compressed_content      TEXT NOT NULL,
+            token_count             INTEGER,
+            covered_message_ids     TEXT,  -- JSON list of message IDs covered by this chunk
+            created_at              TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (conversation_id) REFERENCES conversations(conversation_id) ON DELETE CASCADE
+        );
+        
+        CREATE INDEX IF NOT EXISTS idx_archives_conversation 
+            ON conversation_archives(conversation_id, chunk_index);
+            
+        -- Phase 2: Tier 1 Knowledge Distillation (Semantic Memory)
+        CREATE TABLE IF NOT EXISTS knowledge_distillation (
+            fact_id                 TEXT PRIMARY KEY,
+            conversation_id         TEXT NOT NULL,
+            extracted_fact          TEXT NOT NULL,
+            domain                  TEXT,
+            confidence              REAL,
+            created_at              TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (conversation_id) REFERENCES conversations(conversation_id) ON DELETE CASCADE
+        );
+        
+        CREATE INDEX IF NOT EXISTS idx_knowledge_domain 
+            ON knowledge_distillation(conversation_id, domain);
+            
+        -- Phase 4: System Self-Healing Watchdog
+        CREATE TABLE IF NOT EXISTS ingestion_status (
+            id                      TEXT PRIMARY KEY,
+            file_name               TEXT NOT NULL,
+            status                  TEXT NOT NULL,
+            last_chunk_index        INTEGER DEFAULT 0,
+            created_at              TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at              TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+
+        -- Phase 5: Prompt Injection Security Logs
+        CREATE TABLE IF NOT EXISTS security_logs (
+            id                      TEXT PRIMARY KEY,
+            conversation_id         TEXT,
+            raw_payload             TEXT NOT NULL,
+            threat_vector           TEXT,
+            created_at              TEXT DEFAULT CURRENT_TIMESTAMP
+        );
         """
         
         try:
@@ -265,7 +314,16 @@ class SQLiteDatabase(BaseDatabase):
 
     def _run_migrations(self):
         """Run idempotent schema migrations."""
-        pass
+        with self.get_cursor() as cursor:
+            # 1. Add feedback_score to messages if it doesn't exist
+            try:
+                cursor.execute("SELECT feedback_score FROM messages LIMIT 1")
+            except Exception:
+                logger.info("⚡ Migrating SQLite: Adding 'feedback_score' column to 'messages' table.")
+                try:
+                    cursor.execute("ALTER TABLE messages ADD COLUMN feedback_score INTEGER DEFAULT NULL")
+                except Exception as e:
+                    logger.error(f"Failed to add feedback_score column: {e}")
 
     def create_conversation(self, title: Optional[str] = None, user_id: str = "default", conversation_id: Optional[str] = None) -> str:
         """Create a new conversation."""
@@ -777,6 +835,33 @@ class PostgreSQLDatabase(BaseDatabase):
         
         CREATE INDEX IF NOT EXISTS idx_messages_conversation 
             ON messages(conversation_id, message_created_at);
+            
+        -- Phase 2: Infinite Chat Memory Archives
+        CREATE TABLE IF NOT EXISTS conversation_archives (
+            archive_id              UUID PRIMARY KEY,
+            conversation_id         UUID NOT NULL REFERENCES conversations(conversation_id) ON DELETE CASCADE,
+            chunk_index             INTEGER NOT NULL,
+            compressed_content      TEXT NOT NULL,
+            token_count             INTEGER,
+            covered_message_ids     JSONB,
+            created_at              TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        );
+        
+        CREATE INDEX IF NOT EXISTS idx_archives_conversation 
+            ON conversation_archives(conversation_id, chunk_index);
+            
+        -- Phase 2: Tier 1 Knowledge Distillation (Semantic Memory)
+        CREATE TABLE IF NOT EXISTS knowledge_distillation (
+            fact_id                 UUID PRIMARY KEY,
+            conversation_id         UUID NOT NULL REFERENCES conversations(conversation_id) ON DELETE CASCADE,
+            extracted_fact          TEXT NOT NULL,
+            domain                  TEXT,
+            confidence              REAL,
+            created_at              TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        );
+        
+        CREATE INDEX IF NOT EXISTS idx_knowledge_domain 
+            ON knowledge_distillation(conversation_id, domain);
         """
         
         try:
@@ -1142,6 +1227,27 @@ class DatabaseManager:
         """Initialize database schema."""
         if self._backend:
             self._backend.initialize_schema()
+            
+    from contextlib import contextmanager
+    
+    @contextmanager
+    def get_cursor(self):
+        """Provide a unified cursor context manager depending on the backend."""
+        if not self._backend:
+            raise RuntimeError("Database not connected")
+            
+        # SQLite provides get_cursor directly
+        if hasattr(self._backend, "get_cursor"):
+            with self._backend.get_cursor() as cursor:
+                yield cursor
+        # PostgreSQL provides get_connection
+        elif hasattr(self._backend, "get_connection"):
+            from psycopg2.extras import RealDictCursor
+            with self._backend.get_connection() as conn:
+                with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                    yield cursor
+        else:
+            raise NotImplementedError("Backend does not support cursors")
     
     # Delegate all operations to the backend
     def create_conversation(self, title: Optional[str] = None, user_id: str = "default", conversation_id: Optional[str] = None) -> str:

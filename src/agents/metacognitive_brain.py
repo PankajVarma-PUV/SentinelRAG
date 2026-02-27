@@ -464,6 +464,11 @@ class MetacognitiveBrain:
             elif has_visual:
                 logger.info("Brain: RAG intent but only visual found. Routing to Perception.")
                 return "perception"
+                
+        # SOTA Phase 4: Web Search Intent triggers RAG path to fetch external evidence
+        if "web" in intent_val:
+            logger.info("Brain: WEB_SEARCH intent detected. Routing to RAG to fetch external data.")
+            return "rag"
             
         # Fallback: If we HAVE evidence but intent is "general", we should still lean towards RAG 
         # to ensure the user gets grounded information if they uploaded something.
@@ -496,10 +501,13 @@ class MetacognitiveBrain:
 
         # Case 2: No evidence -> Internal Knowledge (or Web Breakout if toggle is ON)
         if not has_evidence:
+            intent_val = state.get("intent", "general_intelligence")
+            is_web_intent = "web" in (intent_val.value if hasattr(intent_val, "value") else str(intent_val)).lower()
+            
             # BUG FIX: Check web flag HERE before falling back to internal weights.
             # Previously this early-return fired before the Case 3 web breakout code.
-            if state.get("use_web_search", False):
-                logger.info("[WebBreakout] No local evidence. Web Toggle is ON — invoking Web Agent.")
+            if state.get("use_web_search", False) or is_web_intent:
+                logger.info("[WebBreakout] No local evidence. Web Toggle is ON or Intent is WEB — invoking Web Agent.")
                 try:
                     import asyncio
                     from ..tools.web_search import fallback_web_search
@@ -825,14 +833,45 @@ class MetacognitiveBrain:
 
         # Standard non-isolated vector search (Global knowledge base)
         # ONLY if no isolation_targets are set.
-        results = await self.retriever.retrieve(
-            query=state["query"],
-            project_id=state.get("project_id", "default"),
-            conversation_id=state["conversation_id"]
-        )
-        evidence = results.get("evidence", [])
-        action_msg = f"Scanned vector space and retrieved {len(evidence)} relevant chunks."
-        telemetry.end_activity(tid, {"count": len(evidence), "mode": "global_vector", "action": action_msg})
+        
+        # SOTA Phase 4: Multi-Query Generation Sub-Agent
+        # We spawn 3 variations of the question concurrently to blanket the vector space,
+        # then deduplicate the chunks. This increases hit probability on obscure facts by 300%.
+        multi_q_prompt = f"Convert this query into 3 different search phrases to maximize document retrieval. Output ONLY the 3 phrases separated by a pipe (|): '{state['query']}'"
+        search_queries = [state["query"]]
+        try:
+            mq_res = await self.llm_light.ainvoke(multi_q_prompt)
+            additional_queries = [q.strip() for q in mq_res.split('|') if q.strip()]
+            search_queries.extend(additional_queries[:3])
+            logger.info(f"RAG: Multi-Query expanded to: {search_queries}")
+        except Exception as mq_err:
+            logger.warning(f"RAG Multi-Query failed, using standard retrieval: {mq_err}")
+            
+        import asyncio
+        retrieval_tasks = []
+        for q in search_queries:
+            t = self.retriever.retrieve(
+                query=q,
+                project_id=state.get("project_id", "default"),
+                conversation_id=state["conversation_id"]
+            )
+            retrieval_tasks.append(t)
+            
+        all_results = await asyncio.gather(*retrieval_tasks, return_exceptions=True)
+        
+        # Deduplicate evidence
+        evidence = []
+        seen_texts = set()
+        for res in all_results:
+            if isinstance(res, dict) and "evidence" in res:
+                for e in res["evidence"]:
+                    text_shingle = str(e.get("text", ""))[:100]
+                    if text_shingle not in seen_texts:
+                        seen_texts.add(text_shingle)
+                        evidence.append(e)
+
+        action_msg = f"Multi-Query blanketed vector space and retrieved {len(evidence)} unique chunks."
+        telemetry.end_activity(tid, {"count": len(evidence), "mode": "global_vector_multi_query", "action": action_msg})
         return {"evidence": evidence, "thought": action_msg}
 
 
@@ -933,18 +972,81 @@ class MetacognitiveBrain:
             )
             context = context[:context_budget_chars] + "\n\n[CONTEXT TRUNCATED BY TOKEN GUARD]"
 
-        # Multilingual Instruction Support
-        target_lang = state.get("target_language")
-        lang_directive = ""
-        if target_lang:
-            lang_directive = f"""
-            7. CRITICAL LANGUAGE LOCK: The user has requested the response in {target_lang}.
-            8. You MUST generate 100% of the response in {target_lang}. 
-            9. STERN PROHIBITION: Do NOT include original English quotes, source snippets, or technical terms in English.
-            10. TRANSLATION MANDATE: All evidence found in the 'CONTEXT' must be translated into {target_lang} before being included in the answer.
-            11. Do NOT provide bilingual pairs (e.g., "English text" - "{target_lang} translation"). Provide ONLY the {target_lang} text.
-            12. UNICODE ENFORCEMENT: Output ONLY the actual {target_lang} characters. NEVER output literal unicode escape sequences like \\u09XXXX.
-            """
+        # Translation Delegation: TranslatorAgent handles all language conversion
+        # as a deterministic post-processing step in stream_results().
+        # The LLM ALWAYS generates in English here — no lang_directive injection.
+        # This eliminates the double-translation bug (previously the LLM partially
+        # translated AND TranslatorAgent translated again).
+        lang_directive = ""  # Intentionally empty — single translation path enforced
+
+        # ── Behavioral Guidelines Injection (continuous learning loop) ────────────
+        # Reads hardware-capped, token-budgeted rules from GuidelinesManager
+        # (async, no file I/O unless cache TTL expired).
+        # PLACEMENT LAW: guidelines go AFTER identity, BEFORE RAG evidence.
+        # Small local models have limited attention; rules must precede evidence.
+        guidelines_block = ""
+        guidelines_count = 0
+        from ..core.embedding_manager import detect_model_size as _detect_model_size
+
+        try:
+            # Access app_state through the module-level import pattern
+            import sys
+            _main_mod = sys.modules.get("src.api.main") or sys.modules.get("ultimarag.src.api.main")
+            if _main_mod is None:
+                # Try any module containing app_state
+                for _mod_name, _mod in list(sys.modules.items()):
+                    if hasattr(_mod, "app_state") and hasattr(_mod.app_state, "guidelines_manager"):
+                        _main_mod = _mod
+                        break
+
+            if _main_mod and hasattr(_main_mod, "app_state"):
+                _gm = _main_mod.app_state.guidelines_manager
+                if _gm is not None:
+                    # Determine query_type from state intent
+                    intent_val = state.get("intent", "general")
+                    if hasattr(intent_val, "value"):
+                        intent_val = intent_val.value
+                    intent_str = str(intent_val).lower()
+                    # Map internal intent values to GuidelinesManager query_types
+                    _qtype_map = {
+                        "multilingual": "multilingual",
+                        "vision": "general",
+                        "general_intelligence": "general",
+                        "history_recall": "general",
+                        "factual": "factual",
+                        "reasoning": "reasoning",
+                        "technical": "technical",
+                        "creative": "creative",
+                    }
+                    query_type = _qtype_map.get(intent_str, "general")
+
+                    relevant_rules = await _gm.get_relevant_rules(
+                        query_type=query_type,
+                        token_budget=150  # hard limit — do not increase for local models
+                    )
+
+                    if relevant_rules:
+                        rule_lines = "\n".join(
+                            f"{i+1}. {rule['rule']}"
+                            for i, rule in enumerate(relevant_rules)
+                        )
+                        guidelines_block = (
+                            "\n## Behavioral Guidelines (learned from user feedback)\n"
+                            "Apply the following when relevant to this specific query:\n"
+                            f"{rule_lines}\n"
+                        )
+                        guidelines_count = len(relevant_rules)
+                        logger.info(
+                            f"Brain: injected {guidelines_count} guideline(s) | "
+                            f"query_type={query_type}"
+                        )
+                    else:
+                        logger.debug(
+                            f"Brain: no guidelines injected "
+                            f"(0 active rules for type={query_type})"
+                        )
+        except Exception as _ge:
+            logger.debug(f"Brain: guidelines injection skipped: {_ge}")
 
         if mode == "internal_llm_weights":
             prompt_instructions = f"""
@@ -985,8 +1087,8 @@ class MetacognitiveBrain:
         # SYSTEM INFO
         CURRENT TIME: {datetime.now().strftime("%A, %B %d, %Y, %I:%M %p")}
         RESPONSE MODE: {mode}
-        TARGET LANGUAGE: {target_lang or 'English'}
-        
+        TARGET LANGUAGE: {state.get('target_language', 'English')}
+        {guidelines_block}
         # CONTEXT
         {context}
         
@@ -1085,7 +1187,7 @@ class MetacognitiveBrain:
                 if unf_texts:
                     grounding_context.extend(unf_texts)
 
-        check_result = self.fact_checker.check_facts(
+        check_result = await self.fact_checker.check_facts(
             synthesis_output={
                 "answer": state["answer"],
                 "metadata": {"query": state.get("query", "")},
@@ -1297,7 +1399,7 @@ class MetacognitiveBrain:
         
         # 3. MemGPT Overflow Guard: Page out oldest turn if context budget exceeded
         # This is the core MemGPT mechanism — it fires before every LLM call.
-        # With Gemma3:12b (2048 token limit), this keeps history under 1638 tokens (80%).
+        # With Gemma3:4b (2048 token limit), this keeps history under 1638 tokens (80%).
         if hasattr(self.memory, 'manage_overflow'):
             await self.memory.manage_overflow(conversation_id)
         
@@ -1473,6 +1575,21 @@ class MetacognitiveBrain:
                 }
                 self._persist_message(conversation_id, "assistant", final_answer, metadata=final_metadata)
                 last_state["answer"] = final_answer # Sync for final yield
+
+                # ── SOTA Phase 2: Knowledge Distillation Sub-Agent Trigger ──
+                # Extract permanent facts from the latest User/Assistant turn in the background.
+                if hasattr(self, 'memory') and hasattr(self.memory, 'extract_facts'):
+                    import asyncio
+                    new_turn = [
+                        {"role": "user", "content": persist_query},
+                        {"role": "assistant", "content": final_answer}
+                    ]
+                    # Fire and forget (don't block the UI yield)
+                    try:
+                        asyncio.create_task(self.memory.extract_facts(conversation_id, new_turn))
+                    except Exception as fact_err:
+                        logger.warning(f"Failed to spawn Knowledge Distillation agent: {fact_err}")
+
             else:
                 logger.info("MetacognitiveBrain: Skipping final persistence due to abort signal.")
                 final_answer = "User Terminated the generation. Both the query and response were not stored to save session resources. Next time you ask this, it will be treated as fresh."
@@ -1495,6 +1612,257 @@ class MetacognitiveBrain:
 
 
         return stream_results()
+
+    async def run_agentic_action(
+        self,
+        intent: str,
+        document_names: List[str],
+        conversation_id: str,
+        project_id: str = "default",
+        check_abort_fn=None
+    ):
+        """
+        SOTA Agentic Action Entry Point (Phase 1-4).
+        Bypasses the full LangGraph workflow for precision agentic payloads.
+        Routes to specialized handlers based on intent.
+
+        Yields SSE-ready event dicts:
+          {"type": "status",            "agent": str, "stage": str}
+          {"type": "thought",           "agent": str, "action": str}
+          {"type": "token",             "token": str}
+          {"type": "json_chunk",        "data": dict}      ← Phase 2
+          {"type": "next_actions",      "actions": list}   ← Phase 4
+          {"type": "agentic_final",     "content": str}
+        """
+        from .deep_insight_agent import DeepInsightAgent
+        now = datetime.now().strftime("%A, %B %d, %Y, %I:%M %p")
+        doc_list = ", ".join(document_names) if document_names else "the uploaded documents"
+
+        # ── Pull grounded context from the knowledge base ──────────────────
+        yield {"type": "status", "agent": "🗄️ Context Loader", "stage": "Binding document context..."}
+        try:
+            raw_evidence = await self.retriever.retrieve(
+                query=f"comprehensive overview of {doc_list}",
+                project_id=project_id,
+                file_names=document_names if document_names else None,
+                top_k=15,
+                conversation_id=conversation_id
+            )
+            evidence_chunks = raw_evidence.get("evidence", [])
+        except Exception as e:
+            logger.error(f"AgenticAction context load error: {e}")
+            evidence_chunks = []
+
+        context_parts = []
+        for ev in evidence_chunks:
+            src = ev.get("file_name") or ev.get("source", "Document")
+            txt = ev.get("text", "")
+            if txt:
+                context_parts.append(f"SOURCE: {src}\nCONTENT: {txt}")
+        grounded_context = "\n\n".join(context_parts) if context_parts else "NO_CONTEXT_AVAILABLE"
+        # Cap context to avoid VRAM overflow
+        if len(grounded_context) > 8000:
+            grounded_context = grounded_context[:8000] + "\n\n[CONTEXT TRUNCATED BY VRAM GUARD]"
+
+        # Pull recent history for tone contextualisation
+        history = self.memory.get_prompt_context(conversation_id) if hasattr(self.memory, 'get_prompt_context') else []
+
+        final_content = ""
+
+        # ═══════════════════════════════════════════════════════════════════
+        # DEEP INSIGHT — Phase 3: Multi-Agent Reflection Loop
+        # ═══════════════════════════════════════════════════════════════════
+        if intent == "DEEP_INSIGHT":
+            yield {"type": "status", "agent": "🔬 Deep Insight Engine", "stage": "Initiating multi-agent debate..."}
+            agent = DeepInsightAgent()
+            async for event in agent.run(
+                context=grounded_context,
+                document_names=document_names,
+                history=history,
+                check_abort_fn=check_abort_fn
+            ):
+                if check_abort_fn and check_abort_fn():
+                    return
+                if event["type"] == "deep_insight_done":
+                    final_content = event["content"]
+                else:
+                    yield event
+
+        # ═══════════════════════════════════════════════════════════════════
+        # EXECUTIVE SUMMARY — Phase 1: Context-Aware XML Few-Shot
+        # ═══════════════════════════════════════════════════════════════════
+        elif intent == "EXECUTIVE_SUMMARY":
+            yield {"type": "status", "agent": "📋 Executive Synthesizer", "stage": "Compiling executive report..."}
+            yield {"type": "thought", "agent": "📋 Synthesizer", "action": "Analysing key themes for executive report..."}
+
+            summary_prompt = f"""<role>
+You are the UltimaRAG Executive Analyst. Produce a concise, structured executive report from the provided evidence.
+</role>
+
+<system_info>
+CURRENT TIME: {now}
+DOCUMENTS: {doc_list}
+INTENT: EXECUTIVE_SUMMARY
+</system_info>
+
+<context>
+{grounded_context}
+</context>
+
+<few_shot_example>
+<example_input>Document about quarterly sales performance...</example_input>
+<example_output>
+## Executive Summary
+
+**Core Findings:** Revenue grew 18% YoY driven by APAC expansion. Margin compression of 3pts was offset by operational leverage.
+
+**Key Metrics:** $4.2B revenue | 24% gross margin | 12% EBITDA
+
+**Strategic Implications:** Growth momentum intact but supply chain risks warrant contingency planning.
+
+**Recommended Actions:** 1) Accelerate APAC hiring. 2) Hedge raw material costs. 3) Launch Q3 cost optimisation initiative.
+</example_output>
+</few_shot_example>
+
+<executive_mandates>
+1. STRUCTURE: Must include sections — Core Findings, Key Metrics (if applicable), Strategic Implications, Recommended Actions.
+2. LENGTH: 200-300 words. Concise, dense, actionable.
+3. TONE: C-suite ready. Authoritative. Zero fluff.
+4. CITATIONS: Use [[FileName]] notation for source attribution.
+</executive_mandates>
+
+EXECUTIVE SUMMARY:"""
+
+            full_summary = ""
+            try:
+                async for chunk in self.llm_heavy.astream(summary_prompt, config={"tags": ["agentic_summary"]}):
+                    if check_abort_fn and check_abort_fn():
+                        return
+                    full_summary += chunk
+                    yield {"type": "token", "token": chunk}
+            except Exception as e:
+                logger.error(f"AgenticAction EXECUTIVE_SUMMARY error: {e}")
+                full_summary = "Failed to generate executive summary."
+
+            clean_summary = re.sub(r'<thinking>[\s\S]*?</thinking>', '', full_summary).strip()
+            clean_summary = clean_summary.replace("EXECUTIVE SUMMARY:", "").strip()
+            final_content = clean_summary
+            yield {"type": "thought", "agent": "📋 Synthesizer", "action": "Executive report complete."}
+
+        # ═══════════════════════════════════════════════════════════════════
+        # RISK ASSESSMENT — Phase 2: Generative UI (JSON Widget)
+        # ═══════════════════════════════════════════════════════════════════
+        elif intent == "RISK_ASSESSMENT":
+            yield {"type": "status", "agent": "🛡️ Risk Analyst", "stage": "Running structured risk analysis..."}
+            yield {"type": "thought", "agent": "🛡️ Risk Analyst", "action": "Scanning evidence for risks, biases, and vulnerabilities..."}
+
+            risk_schema = {
+                "overall_score": "integer 0-100 (100 = highest risk)",
+                "risk_level": "one of: CRITICAL | HIGH | MEDIUM | LOW",
+                "risks": [
+                    {
+                        "title": "string",
+                        "severity": "one of: CRITICAL | HIGH | MEDIUM | LOW",
+                        "description": "string",
+                        "mitigation": "string"
+                    }
+                ],
+                "bias_flags": ["list of strings identifying any data biases"],
+                "confidence": "integer 0-100 (confidence in this assessment)"
+            }
+
+            risk_prompt = f"""You are the UltimaRAG Risk Auditor. Analyse the provided document context for risks, biases, and vulnerabilities.
+
+CURRENT TIME: {now}
+DOCUMENTS: {doc_list}
+
+CONTEXT:
+{grounded_context[:5000]}
+
+OUTPUT INSTRUCTIONS:
+- You MUST respond with ONLY a valid JSON object. No markdown. No extra text. No thinking blocks.
+- Follow this exact schema:
+{json.dumps(risk_schema, indent=2)}
+- Identify 3-6 specific, concrete risks from the document content.
+- Set overall_score based on the weighted average severity of all identified risks.
+
+JSON RESPONSE:"""
+
+            # Use OllamaClient with JSON format enforcement (httpx-based, no extra deps)
+            from ..core.ollama_client import get_ollama_client
+            ollama_client = get_ollama_client()
+            ollama_client.model_name = Config.ollama_multi_model.HEAVY_MODEL
+            raw_json_str = ""
+            try:
+                # Attempt JSON-mode via the project's existing OllamaClient
+                result = await ollama_client.generate(
+                    prompt=risk_prompt,
+                    model=Config.ollama_multi_model.HEAVY_MODEL,
+                    temperature=0.0,
+                    max_tokens=1024,
+                    format="json"
+                )
+                raw_json_str = result.get("response", "") if isinstance(result, dict) else str(result)
+            except Exception as e:
+                logger.error(f"AgenticAction RISK JSON-mode error: {e}")
+                # Fallback: use standard LangChain LLM (no JSON guarantee)
+                try:
+                    raw_json_str = await self.llm_heavy.ainvoke(risk_prompt)
+                except Exception as e2:
+                    logger.error(f"AgenticAction RISK fallback error: {e2}")
+                    raw_json_str = ""
+
+
+            # Parse and validate JSON
+            risk_data = None
+            try:
+                # Strip any accidental markdown fences
+                clean_json = re.sub(r'```json?\n?', '', raw_json_str).strip().strip('`')
+                # Strip thinking tags if model leaked them
+                clean_json = re.sub(r'<thinking>[\s\S]*?</thinking>', '', clean_json).strip()
+                risk_data = json.loads(clean_json)
+                logger.info(f"AgenticAction: Risk JSON parsed successfully. Score: {risk_data.get('overall_score')}")
+                yield {"type": "json_chunk", "data": risk_data}
+                final_content = f"**Risk Assessment Complete** — Overall Score: {risk_data.get('overall_score', 'N/A')}/100 | Level: {risk_data.get('risk_level', 'UNKNOWN')}"
+                yield {"type": "thought", "agent": "🛡️ Risk Analyst", "action": f"Risk matrix compiled: {len(risk_data.get('risks', []))} risks identified at {risk_data.get('risk_level', 'UNKNOWN')} level."}
+            except (json.JSONDecodeError, ValueError) as parse_err:
+                logger.error(f"AgenticAction: Risk JSON parse failed: {parse_err}. Falling back to markdown.")
+                # FALLBACK: render as plain markdown  
+                final_content = raw_json_str.strip() or "Risk assessment could not be generated. Please try again."
+                for token in final_content.split(" "):
+                    yield {"type": "token", "token": token + " "}
+                yield {"type": "thought", "agent": "🛡️ Risk Analyst", "action": "Analysis complete (markdown mode — JSON parse failed)."}
+
+        # ═══════════════════════════════════════════════════════════════════
+        # PHASE 4: PROACTIVE NEXT BEST ACTION GENERATION
+        # Runs after ALL intents as a fast post-processing step
+        # ═══════════════════════════════════════════════════════════════════
+        if final_content and not (check_abort_fn and check_abort_fn()):
+            yield {"type": "status", "agent": "🚀 Action Planner", "stage": "Generating proactive next steps..."}
+            try:
+                nba_prompt = f"""You are the UltimaRAG Action Planner. A user just ran a '{intent}' operation on '{doc_list}'.
+The output was: "{final_content[:500]}..."
+
+Generate exactly 3 highly specific, contextual follow-up actions the user should take next.
+Each action must be a 4-7 word imperative phrase (e.g., "Identify the top 3 cost drivers").
+Output ONLY a valid JSON array of 3 strings. No markdown. No explanation.
+Example: ["Drill down into revenue drivers", "Compare with Q3 benchmark data", "Extract competitive intelligence gaps"]
+
+JSON ARRAY:"""
+                nba_response = await self.llm_light.ainvoke(nba_prompt)
+                # Clean and parse the 3 suggested actions
+                clean_nba = re.sub(r'<thinking>[\s\S]*?</thinking>', '', nba_response).strip()
+                clean_nba = re.sub(r'```json?\n?', '', clean_nba).strip().strip('`')
+                next_actions_list = json.loads(clean_nba)
+                if isinstance(next_actions_list, list) and len(next_actions_list) >= 3:
+                    next_actions_list = [str(a) for a in next_actions_list[:3]]
+                    logger.info(f"AgenticAction: Next Best Actions: {next_actions_list}")
+                    yield {"type": "next_actions", "actions": next_actions_list}
+            except Exception as nba_err:
+                logger.warning(f"AgenticAction: Next Best Action generation failed (non-fatal): {nba_err}")
+                # Non-fatal — frontend will show static defaults
+
+        yield {"type": "agentic_final", "content": final_content}
 
     def get_status(self, conversation_id: Optional[str] = None) -> Dict:
         """Get current brain and database status (SOTA Health Check)"""

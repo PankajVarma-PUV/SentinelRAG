@@ -60,6 +60,18 @@ class TelemetryManager:
         activity_id = f"{agent_name}_{int(time.time() * 1000)}"
         self.activities[activity_id] = AgentTelemetry(agent_name, stage)
         logger.info(f"📊 Telemetry Start: {agent_name} -> {stage}")
+        
+        import asyncio
+        # Broadcast the startup event
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                data = self.activities[activity_id].to_dict()
+                data["type"] = "telemetry_start"
+                loop.create_task(ws_manager.broadcast(data))
+        except Exception:
+            pass
+            
         return activity_id
 
     def clear_all(self):
@@ -71,12 +83,52 @@ class TelemetryManager:
         if activity_id in self.activities:
             self.activities[activity_id].finish(metadata)
             logger.info(f"📊 Telemetry End: {self.activities[activity_id].agent_name}")
+            import asyncio
+            # Broadcast the completion event
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    data = self.activities[activity_id].to_dict()
+                    data["type"] = "telemetry_end"
+                    loop.create_task(ws_manager.broadcast(data))
+            except Exception:
+                pass
 
-    def get_active_status(self) -> Dict[str, Any]:
-        """Returns the most recent active activity"""
         running = [a.to_dict() for a in self.activities.values() if a.end_time is None]
         return running[-1] if running else {"status": "idle"}
 
-# Global instance
+    def get_active_status(self) -> Dict[str, Any]:
+        """Get the current running activity for telemetry"""
+        running = [a.to_dict() for a in self.activities.values() if a.end_time is None]
+        return running[-1] if running else {"status": "idle"}
+
+# =============================================================================
+# SOTA Phase 5: WebSocket UI Telemetry Manager
+# =============================================================================
+class WebSocketTelemetryManager:
+    """Manages active WebSocket connections for real-time UI telemetry streaming."""
+    def __init__(self):
+        self.active_connections: list = []
+
+    async def connect(self, websocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+        logger.info(f"🔌 WebSocket Connected: {websocket.client.host}. Total: {len(self.active_connections)}")
+
+    def disconnect(self, websocket):
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
+            logger.info(f"🔌 WebSocket Disconnected. Total: {len(self.active_connections)}")
+
+    async def broadcast(self, message: Dict[str, Any]):
+        """Broadcast an event to all connected clients."""
+        for connection in self.active_connections:
+            try:
+                await connection.send_json(message)
+            except Exception as e:
+                logger.warning(f"🔌 WebSocket broadcast failed to a client: {e}")
+                
+# Global instances
+ws_manager = WebSocketTelemetryManager()
 telemetry = TelemetryManager()
 

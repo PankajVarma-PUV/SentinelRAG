@@ -70,13 +70,39 @@ class SearchRequest(BaseModel):
 async def analyze_query(request: AnalyzeRequest):
     """
     Analyze a query without running full pipeline.
-    Useful for debugging query decomposition.
+    Useful for debugging query intent and decomposition.
+    Note: QueryAnalyzer standalone module has been archived (dead code).
+    This endpoint uses lightweight inline heuristics for debugging only.
     """
-    from ..agents.query_analyzer import QueryAnalyzer
-    
     try:
-        analyzer = QueryAnalyzer()
-        result = analyzer.analyze(request.query)
+        import re
+        q = request.query.lower().strip()
+
+        # Intent detection heuristics (inline — QueryAnalyzer module archived)
+        if any(w in q for w in ["compare", "difference", "vs", "versus", "better"]):
+            intent = "comparative"
+        elif any(w in q for w in ["how to", "how do", "steps to", "guide to"]):
+            intent = "procedural"
+        elif q.count("?") > 1 or " and " in q:
+            intent = "multi-hop"
+        elif any(w in q for w in ["summarize", "summary", "tldr", "brief"]):
+            intent = "summarize"
+        else:
+            intent = "factual"
+
+        words = request.query.split()
+        entities = list(set(re.findall(r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b', request.query)))[:5]
+        difficulty = "simple" if len(words) < 10 and intent == "factual" else ("complex" if len(words) > 25 else "medium")
+
+        result = {
+            "original_query": request.query,
+            "intent": intent,
+            "sub_queries": [request.query],
+            "retrieval_queries": [request.query],
+            "entities": entities,
+            "temporal_constraint": None,
+            "difficulty": difficulty
+        }
         return {"success": True, "analysis": result}
     except Exception as e:
         logger.error(f"Analysis error: {e}")

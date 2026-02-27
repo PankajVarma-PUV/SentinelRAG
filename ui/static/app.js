@@ -112,6 +112,7 @@ class UltimaApp {
         this.setupEventListeners();
         await this.loadWorkspace();
         this.updateSystemStatus();
+        this.connectTelemetry();
 
         // Auto-refresh status
         setInterval(() => this.updateSystemStatus(), 30000);
@@ -718,7 +719,7 @@ class UltimaApp {
             `).join('');
 
             html += `
-                <div class="sources-footer animate-slide-up">
+                <div class="sources-footer">
                     <div class="sources-footer-header">
                         <i class="fa-solid fa-book-open"></i>
                         <span>GROUNDED SOURCES</span>
@@ -1193,8 +1194,23 @@ class UltimaApp {
                     thoughtProcessContainer.open = false; // Collapse upon finalization for a clean UI
                 }
                 this.chatLog.scrollTop = this.chatLog.scrollHeight;
-            }
+            },
+            // ── Phase 2: Generative UI — Mount the Risk Dashboard Widget ──
+            mountRiskWidget: (data) => {
+                bubble.innerHTML = this.renderRiskWidget(data);
+                this.chatLog.scrollTop = this.chatLog.scrollHeight;
+            },
+            // ── Phase 3: Close cognitive trace (used after agentic actions) ──
+            closeThoughts: () => {
+                if (thoughtProcessContainer.open) {
+                    thoughtProcessContainer.open = false;
+                }
+                this.chatLog.scrollTop = this.chatLog.scrollHeight;
+            },
+            // ── Phase 4: Expose the bubble DOM element for button injection ──
+            getBubbleEl: () => bubble
         };
+
 
         if (initialContent) api.finalize(initialContent, metadata);
         return api;
@@ -1216,22 +1232,55 @@ class UltimaApp {
         });
     }
 
+    // ── Phase 1: Context-Aware Action Buttons ──────────────────────────
+    // Each button fires a context-bound agentic payload instead of injecting text.
+
     injectActionButtons(container) {
         const bar = document.createElement('div');
         bar.className = 'action-injector-bar animate-slide-up';
+        bar.dataset.agenticBar = 'static'; // Mark as static so Phase 4 can replace it
         bar.innerHTML = `
-            <button class="action-btn" onclick="window.app.triggerSuggestedAction('Extract deeper insights from this analysis in English language.')">
-                <i class="fa-solid fa-microscope text-cyan-400"></i>
-                <span>Deep Insight</span>
+            <div class="action-bar-label"><i class="fa-solid fa-bolt-lightning text-cyan-500/70"></i> Agentic Actions</div>
+            <div class="action-bar-btns flex flex-row flex-wrap gap-3 mt-2">
+                <button class="action-btn" onclick="window.app.triggerAgenticAction('DEEP_INSIGHT', this.closest('[data-agentic-bar]'))">
+                    <i class="fa-solid fa-microscope text-cyan-400"></i>
+                    <span>Deep Insight</span>
+                </button>
+                <button class="action-btn" onclick="window.app.triggerAgenticAction('EXECUTIVE_SUMMARY', this.closest('[data-agentic-bar]'))">
+                    <i class="fa-solid fa-file-invoice text-purple-400"></i>
+                    <span>Executive Summary</span>
+                </button>
+                <button class="action-btn" onclick="window.app.triggerAgenticAction('RISK_ASSESSMENT', this.closest('[data-agentic-bar]'))">
+                    <i class="fa-solid fa-shield-halved text-red-400"></i>
+                    <span>Risk Assessment</span>
+                </button>
+            </div>
+        `;
+        container.appendChild(bar);
+    }
+
+    // ── Phase 4: Dynamic AI-Generated Follow-Up Buttons ───────────────
+    injectDynamicActionButtons(container, nextActions) {
+        // Remove any existing static action bars attached to this bubble
+        const existingBar = container.querySelector('[data-agentic-bar]');
+        if (existingBar) existingBar.remove();
+
+        const bar = document.createElement('div');
+        bar.className = 'action-injector-bar action-bar-dynamic animate-slide-up';
+        bar.dataset.agenticBar = 'dynamic';
+
+        const btnsHtml = nextActions.map((label, i) => `
+            <button class="action-btn action-btn-dynamic" onclick="window.app.triggerSuggestedAction(${JSON.stringify(label)})">
+                <i class="fa-solid fa-arrow-right text-emerald-400"></i>
+                <span>${label}</span>
             </button>
-            <button class="action-btn" onclick="window.app.triggerSuggestedAction('Summarize the core findings as an executive report in English language. Make it a [short/medium/long] summary of approximately [N] words.')">
-                <i class="fa-solid fa-file-invoice text-purple-400"></i>
-                <span>Executive Summary</span>
-            </button>
-            <button class="action-btn" onclick="window.app.triggerSuggestedAction('Identify potential risks or hidden biases in this data in English language.')">
-                <i class="fa-solid fa-shield-halved text-red-400"></i>
-                <span>Risk Assessment</span>
-            </button>
+        `).join('');
+
+        bar.innerHTML = `
+            <div class="action-bar-label action-bar-label-dynamic">
+                <i class="fa-solid fa-wand-magic-sparkles text-emerald-400/80"></i> AI Suggested Next Steps
+            </div>
+            <div class="action-bar-btns flex flex-row flex-wrap gap-3 mt-2">${btnsHtml}</div>
         `;
         container.appendChild(bar);
     }
@@ -1241,6 +1290,235 @@ class UltimaApp {
         this.userInput.focus();
         // Trigger input event to auto-resize textarea if applicable
         this.userInput.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+
+    // ── Phase 1: Agentic Action Trigger ─────────────────────────────────
+    async triggerAgenticAction(intentType, barEl) {
+        if (this.state.isProcessing) return;
+        if (!this.state.activeConversation) {
+            this.appendMessage('ai', '**No active conversation.** Start a chat and upload documents first.');
+            return;
+        }
+
+        // Collect documents visible in the workspace for this conversation
+        const documentIds = this._getWorkspaceFileNames();
+        if (documentIds.length === 0) {
+            // Graceful fallback: still allow the action with empty doc_ids
+            // The backend will attempt to retrieve all chunks from the conversation
+            console.warn('[AgenticAction] No document IDs found — backend will use all conversation chunks.');
+        }
+
+        this.state.isProcessing = true;
+        this.showStopButton();
+        this.showThinkingIndicator();
+        this.showTelemetryHud();
+
+        const controller = new AbortController();
+        this.state.abortController = controller;
+
+        let aiBubble = null;
+        let nextActionsReceived = [];
+        let riskData = null;
+
+        try {
+            const response = await fetch('/query/agentic_action', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    intent: intentType,
+                    conversation_id: this.state.activeConversation,
+                    project_id: this.state.activeProject || 'default',
+                    document_ids: documentIds.length > 0 ? documentIds : null
+                }),
+                signal: controller.signal
+            });
+
+            if (!response.ok) {
+                const errData = await response.json().catch(() => ({}));
+                throw new Error(errData.detail || `HTTP ${response.status}`);
+            }
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+
+                const chunk = decoder.decode(value, { stream: true });
+                const lines = chunk.split('\n');
+
+                for (const line of lines) {
+                    if (!line.startsWith('data: ')) continue;
+                    try {
+                        const data = JSON.parse(line.substring(6));
+
+                        if (data.stage === 'initializing') {
+                            this.updateTelemetry('Ultima', `${intentType.replace('_', ' ')} pipeline starting...`);
+
+                        } else if (data.stage === 'agentic_user_msg') {
+                            // Phase 1: Show the synthetic user message in chat
+                            this.removeThinkingIndicator();
+                            this.appendMessage('user', data.message);
+
+                        } else if (data.stage === 'processing') {
+                            this.updateTelemetry(data.agent || 'Ultima', data.message || 'Processing...');
+
+                        } else if (data.type === 'thought') {
+                            if (!aiBubble) aiBubble = this.createAiBubble();
+                            aiBubble.appendThought(data.agent, data.action);
+
+                        } else if (data.stage === 'streaming') {
+                            this.removeThinkingIndicator();
+                            if (!aiBubble) aiBubble = this.createAiBubble();
+                            aiBubble.appendToken(data.token);
+
+                        } else if (data.stage === 'json_chunk') {
+                            // Phase 2: Generative UI — Risk Widget
+                            this.removeThinkingIndicator();
+                            if (!aiBubble) aiBubble = this.createAiBubble();
+                            riskData = data.data;
+                            aiBubble.mountRiskWidget(data.data);
+
+                        } else if (data.stage === 'next_actions') {
+                            // Phase 4: Proactive Next Best Actions received
+                            nextActionsReceived = data.actions || [];
+
+                        } else if (data.stage === 'result') {
+                            this.removeThinkingIndicator();
+                            this.hideTelemetryHud();
+
+                            if (!aiBubble) {
+                                aiBubble = this.createAiBubble(data.final_response, data);
+                            } else {
+                                // For JSON widget (risk), the bubble already has the widget mounted
+                                // Only call finalize if we have textual content (not risk widget)
+                                if (!riskData) {
+                                    aiBubble.finalize(data.final_response, data);
+                                } else {
+                                    // Close the thought accordion
+                                    aiBubble.closeThoughts();
+                                }
+                            }
+
+                            // Phase 4: Inject dynamic or fallback static buttons
+                            if (aiBubble && aiBubble.getBubbleEl) {
+                                const bubbleEl = aiBubble.getBubbleEl();
+                                if (nextActionsReceived.length >= 3) {
+                                    this.injectDynamicActionButtons(bubbleEl, nextActionsReceived);
+                                } else {
+                                    // Fallback to static action buttons
+                                    this.injectActionButtons(bubbleEl);
+                                }
+                            }
+
+                            await this.loadWorkspace();
+
+                        } else if (data.stage === 'terminated') {
+                            this.removeThinkingIndicator();
+                            this.hideTelemetryHud();
+                            if (aiBubble) aiBubble.closeThoughts();
+                            else this.appendMessage('ai', 'Agentic action terminated.');
+
+                        } else if (data.stage === 'error') {
+                            this.removeThinkingIndicator();
+                            this.hideTelemetryHud();
+                            this.appendMessage('ai', `**Agentic Pipeline Error**: ${data.message}`);
+                        }
+
+                    } catch (e) { console.error('[AgenticAction] Parse error:', e, line); }
+                }
+            }
+        } catch (err) {
+            if (err.name !== 'AbortError') {
+                console.error('[AgenticAction] Error:', err);
+                this.removeThinkingIndicator();
+                this.appendMessage('ai', `**Agentic Action Failed**: ${err.message}`);
+            } else {
+                this.removeThinkingIndicator();
+                this.appendMessage('ai', 'Agentic action cancelled.');
+            }
+        } finally {
+            this.state.isProcessing = false;
+            this.state.abortController = null;
+            this.removeThinkingIndicator();
+            this.hideTelemetryHud();
+            this.hideStopButton();
+        }
+    }
+
+    /** Helper: get file names currently in workspace for the active conversation */
+    _getWorkspaceFileNames() {
+        if (!this.workspaceFilesContainer) return [];
+        const items = this.workspaceFilesContainer.querySelectorAll('.workspace-file-item .file-name');
+        return Array.from(items).map(el => el.textContent.trim()).filter(Boolean);
+    }
+
+    // ── Phase 2: Generative Risk Widget Renderer ─────────────────────────
+    renderRiskWidget(data) {
+        const score = data.overall_score ?? 0;
+        const level = (data.risk_level || 'LOW').toUpperCase();
+        const risks = Array.isArray(data.risks) ? data.risks : [];
+        const biases = Array.isArray(data.bias_flags) ? data.bias_flags : [];
+        const confidence = data.confidence ?? 80;
+
+        const severityColor = {
+            CRITICAL: { bar: '#ef4444', badge: 'risk-severity-critical' },
+            HIGH: { bar: '#f97316', badge: 'risk-severity-high' },
+            MEDIUM: { bar: '#eab308', badge: 'risk-severity-medium' },
+            LOW: { bar: '#22c55e', badge: 'risk-severity-low' }
+        };
+        const levelCols = severityColor[level] || severityColor.LOW;
+
+        // Dial angle: 0-100 maps to -135deg to +135deg
+        const dialAngle = -135 + (score / 100) * 270;
+
+        const risksHtml = risks.map(r => {
+            const sev = (r.severity || 'LOW').toUpperCase();
+            const style = severityColor[sev] || severityColor.LOW;
+            return `
+                <div class="risk-item">
+                    <div class="risk-item-header">
+                        <span class="risk-severity-badge ${style.badge}">${sev}</span>
+                        <span class="risk-item-title">${r.title || 'Unknown Risk'}</span>
+                    </div>
+                    <p class="risk-item-desc">${r.description || ''}</p>
+                    ${r.mitigation ? `<div class="risk-item-mitigation"><i class="fa-solid fa-shield-check"></i> ${r.mitigation}</div>` : ''}
+                </div>
+            `;
+        }).join('');
+
+        const biasHtml = biases.length > 0 ? `
+            <div class="risk-bias-section">
+                <div class="risk-section-title"><i class="fa-solid fa-triangle-exclamation"></i> Detected Biases</div>
+                ${biases.map(b => `<div class="risk-bias-item">${b}</div>`).join('')}
+            </div>` : '';
+
+        return `
+            <div class="risk-widget animate-slide-up">
+                <div class="risk-widget-header">
+                    <div class="risk-dial-container">
+                        <svg class="risk-dial-svg" viewBox="0 0 120 70" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M10 65 A50 50 0 0 1 110 65" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="10" stroke-linecap="round"/>
+                            <path d="M10 65 A50 50 0 0 1 110 65" fill="none" stroke="${levelCols.bar}" stroke-width="10" stroke-linecap="round"
+                                stroke-dasharray="157" stroke-dashoffset="${157 - (157 * score / 100)}"
+                                style="filter: drop-shadow(0 0 6px ${levelCols.bar}88)"
+                            />
+                            <text x="60" y="58" text-anchor="middle" font-size="20" font-weight="700" fill="white">${score}</text>
+                            <text x="60" y="68" text-anchor="middle" font-size="7" fill="rgba(255,255,255,0.5)" letter-spacing="1">RISK SCORE</text>
+                        </svg>
+                    </div>
+                    <div class="risk-summary-block">
+                        <div class="risk-level-badge risk-severity-badge ${levelCols.badge}" style="font-size:15px;padding:4px 14px">${level}</div>
+                        <div class="risk-meta-row"><i class="fa-solid fa-bullseye"></i> <span>${risks.length} risk(s) identified</span></div>
+                        <div class="risk-meta-row"><i class="fa-solid fa-circle-check"></i> <span>Confidence: ${confidence}%</span></div>
+                    </div>
+                </div>
+                <div class="risk-section-title"><i class="fa-solid fa-triangle-exclamation text-red-400"></i> Risk Matrix</div>
+                <div class="risk-items-container">${risksHtml}</div>
+                ${biasHtml}
+            </div>
+        `;
     }
 
     // ── STOP GENERATION HELPERS ──────────────────────────────────────────
@@ -1339,8 +1617,54 @@ class UltimaApp {
             this.telemetryStage.style.opacity = '1';
         }
 
-        this.telemetryHud.classList.remove('hidden');
-        this.telemetryHud.classList.add('flex');
+        this.showTelemetryHud();
+    }
+
+    // =========================================================================
+    // SOTA Phase 5: WebSocket UI Telemetry Loop
+    // =========================================================================
+
+    connectTelemetry() {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/telemetry/ws`;
+
+        console.log(`🔌 Initializing Global UI Telemetry connect: `, wsUrl);
+        this.ws = new WebSocket(wsUrl);
+
+        this.ws.onopen = () => {
+            console.log("🔌 Connected to Ultima SOTA Telemetry Socket");
+            // Ping loop to keep connection alive
+            this.pingInterval = setInterval(() => {
+                if (this.ws.readyState === WebSocket.OPEN) this.ws.send("ping");
+            }, 15000);
+        };
+
+        this.ws.onmessage = (event) => {
+            try {
+                if (event.data === "pong") return;
+                const data = JSON.parse(event.data);
+
+                if (data.type === "telemetry_start") {
+                    this.updateTelemetry(data.agent, data.stage || "processing");
+                }
+                else if (data.type === "telemetry_end") {
+                    // Hide the HUD if there are no more active agents running.
+                    // Instead of full state tracking, we just hide it on end, 
+                    // and allow the streaming HTTP response to show/hide it as well.
+                    this.hideTelemetryHud();
+                }
+            } catch (e) { /* ignore parse errors for ping/pong */ }
+        };
+
+        this.ws.onclose = () => {
+            console.warn("🔌 Telemetry Socket disconnected. Retrying in 5s.");
+            clearInterval(this.pingInterval);
+            setTimeout(() => this.connectTelemetry(), 5000);
+        };
+
+        this.ws.onerror = (err) => {
+            console.error("🔌 Telemetry socket error", err);
+        };
     }
 
     async updateSystemStatus() {
@@ -2103,6 +2427,106 @@ class UltimaApp {
             return;
         }
 
+        // --- SOTA Phase 5: System Purge Visuals (Inline Styles to bypass Cache) ---
+        // Ensure old style block is removed if it exists
+        const oldStyle = document.getElementById('nuke-dynamic-styles');
+        if (oldStyle) oldStyle.remove();
+
+        const style = document.createElement('style');
+        style.id = 'nuke-dynamic-styles';
+        style.innerHTML = `
+            #nuke-overlay {
+                position: fixed; inset: 0; background: rgba(5, 5, 10, 0.95); backdrop-filter: blur(24px); 
+                z-index: 99999; display: flex; flex-direction: column; align-items: center; justify-content: center;
+                color: #ef4444; font-family: 'Inter', monospace; opacity: 0; transition: opacity 0.5s;
+            }
+            #nuke-overlay.active { opacity: 1; }
+            .nuke-radar-container {
+                position: relative; width: 220px; height: 220px; border-radius: 50%;
+                border: 2px solid rgba(239, 68, 68, 0.2); box-shadow: 0 0 50px rgba(239, 68, 68, 0.1);
+                display: flex; align-items: center; justify-content: center; margin-bottom: 40px;
+            }
+            .nuke-radar-sweep {
+                position: absolute; inset: 0; border-radius: 50%;
+                background: conic-gradient(rgba(239, 68, 68, 0.6) 0deg, transparent 70deg);
+                animation: radar-spin 1.5s linear infinite;
+            }
+            .nuke-radar-circle {
+                position: absolute; width: 100%; height: 100%; border-radius: 50%; 
+                border: 2px dashed rgba(239, 68, 68, 0.5);
+                animation: pulse-ring 2s cubic-bezier(0.1, 0.8, 0.3, 1) infinite;
+            }
+            .nuke-icon-center {
+                font-size: 4rem; z-index: 2; text-shadow: 0 0 30px #ef4444;
+                animation: shake-icon 0.5s infinite;
+            }
+            .nuke-text-glitch {
+                font-size: 2.2rem; font-weight: 900; letter-spacing: 6px; text-transform: uppercase;
+                text-shadow: 0 0 15px rgba(239, 68, 68, 0.8); margin-bottom: 15px; text-align: center;
+            }
+            .nuke-subtext {
+                color: #fca5a5; font-size: 1rem; letter-spacing: 3px; font-weight: 600;
+                animation: blink-text 1s infinite alternate; text-align: center;
+            }
+            .nuke-data-stream {
+                position: absolute; right: 40px; top: 40px; font-size: 0.75rem; color: #ef4444; opacity: 0.6;
+                text-align: right; line-height: 1.8; font-family: monospace; letter-spacing: 1px;
+            }
+            @keyframes radar-spin { 100% { transform: rotate(360deg); } }
+            @keyframes pulse-ring { 0% { transform: scale(0.6); opacity: 1; } 100% { transform: scale(1.6); opacity: 0; } }
+            @keyframes shake-icon { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
+            @keyframes blink-text { from { opacity: 0.3; } to { opacity: 1; } }
+            
+            /* Success State */
+            #nuke-overlay.success-state { color: #10b981; }
+            #nuke-overlay.success-state .nuke-radar-sweep { display: none; }
+            #nuke-overlay.success-state .nuke-radar-container { border-color: #10b981; box-shadow: 0 0 50px rgba(16, 185, 129, 0.2); }
+            #nuke-overlay.success-state .nuke-radar-circle { border: 2px solid rgba(16, 185, 129, 0.5); animation: none; transform: scale(1.1); }
+            #nuke-overlay.success-state .nuke-icon-center { color: #10b981; text-shadow: 0 0 30px #10b981; animation: none; }
+            #nuke-overlay.success-state .nuke-text-glitch { color: #10b981; text-shadow: 0 0 15px rgba(16, 185, 129, 0.8); }
+            #nuke-overlay.success-state .nuke-subtext { color: #6ee7b7; animation: none; font-weight: bold; }
+            #nuke-overlay.success-state .nuke-data-stream { color: #10b981; }
+        `;
+        document.head.appendChild(style);
+
+        const overlay = document.createElement('div');
+        overlay.id = 'nuke-overlay';
+        overlay.innerHTML = `
+            <div class="nuke-data-stream" id="nukeDataStream">
+                INITIATING OVERRIDE PROTOCOL<br>
+                BYPASSING SAFETY INTERLOCKS<br>
+                ERASING VECTOR EMBEDDINGS<br>
+                DROPPING SCHEMA TABLES
+            </div>
+            <div class="nuke-radar-container">
+                <div class="nuke-radar-circle"></div>
+                <div class="nuke-radar-sweep"></div>
+                <i class="fa-solid fa-radiation nuke-icon-center" id="nukeIcon"></i>
+            </div>
+            <div class="nuke-text-glitch" id="nukeTitle">SYSTEM PURGE ACTIVE</div>
+            <div class="nuke-subtext" id="nukeSub">WIPING ALL DATABASES AND MEMORY... DO NOT CLOSE WINDOW.</div>
+        `;
+        document.body.appendChild(overlay);
+
+        // Randomize data stream text to make it look cool/animated
+        let streamInterval = setInterval(() => {
+            const streamEl = document.getElementById('nukeDataStream');
+            if (streamEl) {
+                const hex1 = Math.floor(Math.random() * 0xFFFFF).toString(16).toUpperCase();
+                const hex2 = Math.floor(Math.random() * 0xFFFFF).toString(16).toUpperCase();
+                streamEl.innerHTML = `
+                    DELETING SECTOR 0x${hex1}...<br>
+                    OVERWRITING MEMORY...<br>
+                    SHREDDING 0x${hex2}...<br>
+                    PURGING VECTORS...
+                `;
+            }
+        }, 300);
+
+        // Force reflow
+        void overlay.offsetWidth;
+        overlay.classList.add('active');
+
         try {
             const resp = await fetch('/api/admin/nuke', {
                 method: 'POST',
@@ -2111,14 +2535,29 @@ class UltimaApp {
             });
 
             const data = await resp.json();
+
+            clearInterval(streamInterval);
+
             if (data.success) {
-                alert("SYSTEM PURGE SUCCESSFUL: All data has been wiped. The application will now reload.");
-                window.location.reload();
+                overlay.classList.add('success-state');
+                document.getElementById('nukeIcon').className = 'fa-solid fa-check-circle nuke-icon-center';
+                document.getElementById('nukeTitle').innerText = 'PURGE SUCCESSFUL';
+                document.getElementById('nukeSub').innerText = 'ALL CONTEXT HAS BEEN ERASED. RELOADING...';
+                document.getElementById('nukeDataStream').innerHTML = 'SYSTEM RESET COMPLETE.';
+
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000);
             } else {
+                overlay.classList.remove('active');
+                setTimeout(() => { overlay.remove(); style.remove(); }, 500);
                 alert("PURGE FAILED: " + (data.detail || "Administrative privilege escalation failed."));
             }
         } catch (e) {
+            clearInterval(streamInterval);
             console.error("Nuke Error:", e);
+            overlay.classList.remove('active');
+            setTimeout(() => { overlay.remove(); style.remove(); }, 500);
             alert("A critical error occurred during the system purge.");
         }
     }
