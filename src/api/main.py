@@ -1,5 +1,8 @@
-# UltimaRAG — Multi-Agent RAG System
-# Copyright (C) 2026 Pankaj Varma
+# SpandaOS — The Living Pulse of Agentic Intelligence
+# A self-pulsing intelligence that lives at the core of the system — perpetually vibrating, continuously learning from every interaction, self-correcting its own errors, and driving all reasoning from a single living center — not because it was told to, but because that is its fundamental nature.
+# Copyright (C) 2026 Pankaj Umesh Varma
+# Contact: 9372123700
+# Email: pv43770@gmail.com
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +18,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-FastAPI Main Application for UltimaRAG
+FastAPI Main Application for SpandaOS
 REST API backend for the multi-agent RAG system.
 """
 
@@ -57,7 +60,7 @@ from ..core.telemetry import ws_manager
 from ..data.chunking import DocumentChunker
 from ..data.embedder import get_embedder, embed_chunks
 from ..data.database import DatabaseManager, get_database as get_relational_db, init_database
-from ..core.database import UltimaRAGDatabase, get_database as get_vector_db
+from ..core.database import SpandaOSDatabase, get_database as get_vector_db
 from ..core.memory import MemoryManager
 from ..agents.metacognitive_brain import MetacognitiveBrain
 from ..vision.manager import MultimodalManager
@@ -195,9 +198,9 @@ class ConversationWithMessages(BaseModel):
 # =============================================================================
 
 class AppState:
-    """Application state container (UltimaRAG Edition)"""
+    """Application state container (SpandaOS Edition)"""
     brain: Optional[Any] = None             # MetacognitiveBrain
-    db: Optional[Any] = None               # UltimaRAGDatabase
+    db: Optional[Any] = None               # SpandaOSDatabase
     sqlite_db: Optional[Any] = None        # DatabaseManager
     memory: Optional[Any] = None           # MemoryManager
     watchdog: Optional[Any] = None         # IngestionWatchdog
@@ -231,7 +234,7 @@ async def _run_startup_diagnostics(state) -> None:
 
     divider = "═" * 62
     print(f"\n{divider}")
-    print("  UltimaRAG — Startup Diagnostics")
+    print("  SpandaOS — Startup Diagnostics")
     print(f"{divider}")
 
     # Model configuration
@@ -287,7 +290,7 @@ async def _run_startup_diagnostics(state) -> None:
 async def lifespan(app: FastAPI):
     """Application lifespan manager for startup/shutdown"""
     # Startup
-    logger.info("🚀 Starting UltimaRAG API...")
+    logger.info("🚀 Starting SpandaOS API...")
     set_seed(Config.deterministic.RANDOM_SEED)
     Config.validate_context_budget()
     
@@ -303,19 +306,19 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"❌ Database Initialization Error: {e}")
     
-    # 2. Initialize UltimaRAG Metacognitive Core
+    # 2. Initialize SpandaOS Metacognitive Core
     try:
-        logger.info("[2/3] Initializing UltimaRAG Metacognitive Brain...")
-        app_state.db = UltimaRAGDatabase()
+        logger.info("[2/3] Initializing SpandaOS Metacognitive Brain...")
+        app_state.db = SpandaOSDatabase()
         app_state.memory = MemoryManager(app_state.db)
         # Pass sqlite_db so the brain can query scraped_content (lives in SQLite, not LanceDB)
         app_state.brain = MetacognitiveBrain(
             app_state.db, app_state.memory,
             sqlite_db=app_state.sqlite_db if hasattr(app_state, 'sqlite_db') and app_state.sqlite_db else None
         )
-        logger.info("✅ UltimaRAG Brain initialized.")
+        logger.info("✅ SpandaOS Brain initialized.")
     except Exception as e:
-        logger.error(f"❌ Failed to initialize UltimaRAG Brain: {e}")
+        logger.error(f"❌ Failed to initialize SpandaOS Brain: {e}")
         import traceback
         logger.error(traceback.format_exc())
         app_state.ready = False
@@ -387,7 +390,7 @@ async def lifespan(app: FastAPI):
         
     # 3. Final Readiness and Warming
     try:
-        logger.info("[3/3] Finalizing UltimaRAG SOTA Stack...")
+        logger.info("[3/3] Finalizing SpandaOS SOTA Stack...")
         # Pre-warm Vision/OCR Models to eliminate cold-start latency
         try:
             if app_state.multimodal_manager:
@@ -395,7 +398,7 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.error(f"⚠️ Model warming failed (non-fatal): {e}")
         app_state.ready = True
-        logger.info("🧠 UltimaRAG SOTA Stack Fully Ready.")
+        logger.info("🧠 SpandaOS SOTA Stack Fully Ready.")
         
         # Start System Watchdog
         try:
@@ -412,7 +415,7 @@ async def lifespan(app: FastAPI):
     yield
 
     # ── Shutdown ─────────────────────────────────────────────────────────────────
-    logger.info("Shutting down UltimaRAG API...")
+    logger.info("Shutting down SpandaOS API...")
 
     # Wait for any in-progress reflection writes before exit (prevents JSON corruption)
     try:
@@ -432,7 +435,7 @@ async def lifespan(app: FastAPI):
 # =============================================================================
 
 app = FastAPI(
-    title="UltimaRAG API",
+    title="SpandaOS API",
     description="Multi-Agent RAG System with hallucination prevention",
     version="1.0.0",
     lifespan=lifespan
@@ -467,7 +470,7 @@ async def home(request: Request):
     """Serve the main UI"""
     if templates:
         return templates.TemplateResponse("index.html", {"request": request})
-    return HTMLResponse("<h1>UltimaRAG API</h1><p>UI not found. Use /docs for API documentation.</p>")
+    return HTMLResponse("<h1>SpandaOS API</h1><p>UI not found. Use /docs for API documentation.</p>")
 
 
 @app.get("/favicon.ico", include_in_schema=False)
@@ -503,11 +506,11 @@ async def health_check(conversation_id: Optional[str] = None):
 @app.post("/query", response_model=QueryResponse)
 async def process_query(request: QueryRequest):
     """
-    UltimaRAG Metacognitive Entry Point.
+    SpandaOS Metacognitive Entry Point.
     Routes all queries through the LangGraph reasoning loop.
     """
     if not app_state.brain:
-        raise HTTPException(status_code=503, detail="UltimaRAG Brain not initialized")
+        raise HTTPException(status_code=503, detail="SpandaOS Brain not initialized")
     
     try:
         # Parse @mentions from query text
@@ -558,7 +561,7 @@ async def process_query(request: QueryRequest):
             success=False,
             query=request.query,
             should_answer=False,
-            final_response=f"UltimaRAG Brain encountered an internal error: {str(e)}",
+            final_response=f"SpandaOS Brain encountered an internal error: {str(e)}",
             conversation_id=request.conversation_id
         )
 
@@ -615,7 +618,7 @@ async def stream_query(request: QueryRequest):
             # ── SHORTCIRCUIT 2: SOTA Prompt Injection Firewall ──────────
             # Use the app-level singleton — avoids cold init on every request
             if app_state.firewall and app_state.firewall.detect_injection(clean_query, conv_id):
-                defense_msg = "Security Alert: This prompt exhibits characteristics of an adversarial attack or system bypass attempt. Request denied by UltimaRAG Firewall."
+                defense_msg = "Security Alert: This prompt exhibits characteristics of an adversarial attack or system bypass attempt. Request denied by SpandaOS Firewall."
                 yield f"data: {json.dumps({'stage': 'processing', 'agent': 'Firewall', 'message': 'Intercepted malicious request', 'status': 'blocked'}, ensure_ascii=False)}\n\n"
                 
                 async for chunk in simulate_streaming(defense_msg):
@@ -697,6 +700,8 @@ async def stream_query(request: QueryRequest):
                         'conversation_id': result.get('conversation_id'),
                         'retrieved_fragments': result.get('retrieved_fragments', {}),
                         'source_map': result.get('source_map', {}),
+                        # ── FEEDBACK: Echo original query for thumbs-up/down payload ──
+                        'query': clean_query,
                     }
                     yield f"data: {json.dumps(final_data, ensure_ascii=False)}\n\n"
             
@@ -735,6 +740,7 @@ async def abort_query(request: AbortRequest):
     return {"success": True, "message": "Abort signal sent", "conversation_id": conv_id}
 
 
+
 # ── SOTA AGENTIC ACTION ENDPOINT ──────────────────────────────────────────
 # Phase 1: Context-Aware UI Payload Binding
 # Phase 2: Generative UI (JSON Risk Widget)
@@ -767,7 +773,7 @@ async def agentic_action(request: AgenticActionRequest):
     Non-breaking: existing /query/stream endpoint is not modified.
     """
     if not app_state.brain:
-        raise HTTPException(status_code=503, detail="UltimaRAG Brain not initialized")
+        raise HTTPException(status_code=503, detail="SpandaOS Brain not initialized")
 
     valid_intents = {"DEEP_INSIGHT", "EXECUTIVE_SUMMARY", "RISK_ASSESSMENT"}
     if request.intent not in valid_intents:
@@ -872,62 +878,96 @@ async def agentic_action(request: AgenticActionRequest):
 
 
 class FeedbackRequest(BaseModel):
-    """User feedback for a specific turn"""
-    conversation_id: str
-    message_id: str
-    score: int  # 1 for positive, -1 for negative
-    feedback_text: Optional[str] = None
+    """User feedback for a specific turn.
+    Supports two modes:
+      1. message_id mode: reads query/response from SQLite (preferred when available)
+      2. text mode: query + response passed directly (frontend fallback when message_id unknown)
+    """
+    conversation_id: Optional[str] = None   # Optional to avoid 422 when no session exists
+    message_id: Optional[str] = None        # Preferred: look up query/response from DB
+    score: int                              # 1 = thumbs up, -1 = thumbs down
+    feedback_text: Optional[str] = None     # Optional free-text comment
+    # Text fallback (used when message_id is None)
+    query: Optional[str] = None
+    response: Optional[str] = None
 
 @app.post("/query/feedback")
 async def submit_feedback(request: FeedbackRequest, background_tasks: BackgroundTasks):
     """
-    Submit feedback for a generation.
-    Negative score (< 0) triggers the ReflectionAgent via non-blocking
-    schedule_reflection(). Returns HTTP 200 IMMEDIATELY — learning is async.
+    Self-learning feedback endpoint (thumbs up / thumbs down).
+
+    Supports two modes:
+      1. message_id mode (preferred): Reads query & response from SQLite,
+         also records feedback_score in the messages table.
+      2. Text fallback mode: Uses query + response fields directly from
+         the JSON payload (when the frontend doesn't have the message_id).
+
+    Negative score (thumbs down) triggers ReflectionAgent non-blocking learning.
+    Positive score (thumbs up) is logged for future analytics.
+    Returns HTTP 200 immediately in ALL cases — learning is async.
     """
     try:
-        if not app_state.sqlite_db:
-            raise HTTPException(status_code=503, detail="SQLite Database not connected")
+        query_text = ""
+        response_text = ""
 
-        # 1. Update the feedback score in SQLite
-        with app_state.sqlite_db.get_cursor() as cursor:
-            cursor.execute(
-                "UPDATE messages SET feedback_score = ? WHERE message_id = ?",
-                (request.score, request.message_id)
-            )
+        # ── Mode 1: message_id-based lookup + DB persistence ────────────────
+        if request.message_id and app_state.sqlite_db:
+            try:
+                with app_state.sqlite_db.get_cursor() as cursor:
+                    # Store feedback score on the assistant message
+                    cursor.execute(
+                        "UPDATE messages SET feedback_score = ? WHERE message_id = ?",
+                        (request.score, request.message_id)
+                    )
 
-        logger.info(f"Feedback ({request.score}) registered for message: {request.message_id}")
+                    # Fetch response content + parent query for ReflectionAgent
+                    cursor.execute(
+                        "SELECT content, parent_message_id FROM messages WHERE message_id = ?",
+                        (request.message_id,)
+                    )
+                    row = cursor.fetchone()
+                    if row:
+                        response_text = row["content"]
+                        parent_id = row["parent_message_id"]
+                        if parent_id:
+                            cursor.execute(
+                                "SELECT content FROM messages WHERE message_id = ?",
+                                (parent_id,)
+                            )
+                            p_row = cursor.fetchone()
+                            if p_row:
+                                query_text = p_row["content"]
 
-        # 2. Trigger ReflectionAgent for negative scores
+                logger.info(f"Feedback ({request.score}) registered for message: {request.message_id}")
+            except Exception as db_err:
+                logger.warning(f"DB feedback lookup failed (using text fallback): {db_err}")
+                query_text = request.query or ""
+                response_text = request.response or ""
+
+        # ── Mode 2: text fallback ────────────────────────────────────────────
+        else:
+            query_text = request.query or ""
+            response_text = request.response or ""
+
+        # ── Trigger ReflectionAgent for thumbs-down ──────────────────────────
         if request.score < 0 and app_state.reflection_agent:
-            with app_state.sqlite_db.get_cursor() as cursor:
-                cursor.execute(
-                    "SELECT content, parent_message_id FROM messages WHERE message_id = ?",
-                    (request.message_id,)
+            if query_text or response_text:
+                app_state.reflection_agent.schedule_reflection({
+                    "query": query_text,
+                    "response": response_text,
+                    "feedback_type": "thumbs_down",
+                    "feedback_id": str(uuid.uuid4()),
+                    "user_id": "default",
+                    "conversation_id": request.conversation_id,
+                })
+                logger.info(
+                    f"Thumbs-down → ReflectionAgent | conv={request.conversation_id} | "
+                    f"query={query_text[:60]}..."
                 )
-                row = cursor.fetchone()
-                if row:
-                    content = row["content"]
-                    parent_id = row["parent_message_id"]
-
-                    query = ""
-                    if parent_id:
-                        cursor.execute(
-                            "SELECT content FROM messages WHERE message_id = ?",
-                            (parent_id,)
-                        )
-                        p_row = cursor.fetchone()
-                        if p_row:
-                            query = p_row["content"]
-
-                    # Non-blocking fire-and-forget — returns HTTP 200 immediately
-                    app_state.reflection_agent.schedule_reflection({
-                        "query": query,
-                        "response": content,
-                        "feedback_type": "thumbs_down",
-                        "feedback_id": str(uuid.uuid4()),
-                        "user_id": "default",
-                    })
+            else:
+                logger.warning("Thumbs-down received but no query/response text available for reflection.")
+        elif request.score > 0:
+            logger.info(f"Thumbs-up received | conv={request.conversation_id}")
 
         return {"success": True, "message": "Feedback received. Learning in progress."}
 
@@ -1274,7 +1314,7 @@ async def unified_query(
     # Parse form string to bool
     _use_web_search = str(use_web_search).lower() == "true"
     if not app_state.brain:
-        error_detail = app_state.startup_error or "UltimaRAG Brain not initialized. Please check server logs."
+        error_detail = app_state.startup_error or "SpandaOS Brain not initialized. Please check server logs."
         raise HTTPException(status_code=503, detail=error_detail)
     
     async def unified_generator():
@@ -1397,7 +1437,7 @@ async def unified_query(
             
             # SOTA Phase 5: Security Magic - Prompt Injection Firewall (singleton)
             if app_state.firewall and app_state.firewall.detect_injection(clean_query, chat_id):
-                defense_msg = "Security Alert: This prompt exhibits characteristics of an adversarial attack or system bypass attempt. Request denied by UltimaRAG Firewall."
+                defense_msg = "Security Alert: This prompt exhibits characteristics of an adversarial attack or system bypass attempt. Request denied by SpandaOS Firewall."
                 yield f"data: {json.dumps({'stage': 'processing', 'agent': 'Firewall', 'message': 'Intercepted malicious request', 'status': 'blocked'}, ensure_ascii=False)}\n\n"
                 
                 async for chunk in simulate_streaming(defense_msg):
@@ -2076,7 +2116,7 @@ async def pdf_query_generate(
     """
     import uuid, json as _json
     if not app_state.brain:
-        raise HTTPException(status_code=503, detail="UltimaRAG Brain not initialized.")
+        raise HTTPException(status_code=503, detail="SpandaOS Brain not initialized.")
 
     # Parse mentioned files
     files_list: List[str] = []
@@ -2138,7 +2178,7 @@ async def pdf_query_generate(
     session_token = str(uuid.uuid4())
     # db = get_relational_db() # Removed this line as it's no longer used
     # conv = db.get_conversation(conversation_id) if db else {} # Removed this line as it's no longer used
-    # conv_title = (conv or {}).get("title") or (conv or {}).get("name") or "UltimaRAG Export" # Removed this line as it's no longer used
+    # conv_title = (conv or {}).get("title") or (conv or {}).get("name") or "SpandaOS Export" # Removed this line as it's no longer used
 
     _pdf_sessions[session_token] = {
         "query": query,
@@ -2173,10 +2213,10 @@ async def pdf_download(session_token: str):
             response=session["response"],
             conversation_id=session["conversation_id"],
             mentioned_files=session.get("mentioned_files"),
-            conversation_title=session.get("title", "UltimaRAG Export"),
+            conversation_title=session.get("title", "SpandaOS Export"),
         )
         safe_title = "".join(c if c.isalnum() or c in (' ', '-', '_') else '_' for c in session.get("title", "Export"))[:40]
-        filename = f"UltimaRAG_QueryExport_{safe_title}.pdf"
+        filename = f"SpandaOS_QueryExport_{safe_title}.pdf"
 
         # Clean up session after download (optional: keep for re-downloads)
         # _pdf_sessions.pop(session_token, None)
@@ -2225,7 +2265,7 @@ async def export_conversation_pdf(conversation_id: str, scope: Optional[str] = "
         # Build filename
         title = conversation.get('title') or conversation.get('name') or 'conversation'
         safe_title = "".join(c if c.isalnum() or c in (' ', '-', '_') else '_' for c in title)[:50]
-        filename = f"UltimaRAG_{safe_title}_{scope}.pdf"
+        filename = f"SpandaOS_{safe_title}_{scope}.pdf"
         
         return StreamingResponse(
             io.BytesIO(pdf_bytes),
@@ -2262,7 +2302,7 @@ async def admin_nuke(request: NukeRequest):
     
     # Refresh app_state databases to ensure the UI gets empty results
     app_state.sqlite_db = get_relational_db()
-    app_state.db = UltimaRAGDatabase()
+    app_state.db = SpandaOSDatabase()
     app_state.memory = MemoryManager(app_state.db)
     app_state.brain = MetacognitiveBrain(
         app_state.db, app_state.memory,

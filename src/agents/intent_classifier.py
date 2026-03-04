@@ -1,5 +1,8 @@
-# UltimaRAG — Multi-Agent RAG System
-# Copyright (C) 2026 Pankaj Varma
+# SpandaOS — The Living Pulse of Agentic Intelligence
+# A self-pulsing intelligence that lives at the core of the system — perpetually vibrating, continuously learning from every interaction, self-correcting its own errors, and driving all reasoning from a single living center — not because it was told to, but because that is its fundamental nature.
+# Copyright (C) 2026 Pankaj Umesh Varma
+# Contact: 9372123700
+# Email: pv43770@gmail.com
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
@@ -40,7 +43,7 @@ def strip_mentions(query: str) -> str:
 
 class IntentClassifier:
     """
-    SOTA Wise Intent Router for UltimaRAG Metacognitive Brain.
+    SOTA Wise Intent Router for SpandaOS Metacognitive Brain.
     Classifies user intent into 4 buckets:
     - GENERAL: Chat, Translation, Knowledge
     - RAG: Document search
@@ -55,7 +58,7 @@ class IntentClassifier:
             base_url=Config.ollama.BASE_URL,
             timeout=Config.ollama.TIMEOUT
         )
-        logger.info("Wise Intent Router (UltimaRAG Edition) initialized")
+        logger.info("Wise Intent Router (SpandaOS Edition) initialized")
     
     async def classify(self, query: str, mentioned_files: list = None) -> tuple:
         """
@@ -95,7 +98,7 @@ class IntentClassifier:
 
         prompt = f"""
 <role>
-You are the UltimaRAG Wise Intent Router. Classify inquiries into the most efficient processing pipeline with high-fidelity calibration.
+You are the SpandaOS Wise Intent Router. Classify inquiries into the most efficient processing pipeline with high-fidelity calibration.
 </role>
 
 <taxonomy>

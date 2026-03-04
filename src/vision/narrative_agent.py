@@ -1,8 +1,10 @@
-# UltimaRAG — Multi-Agent RAG System
-# Copyright (C) 2026 Pankaj Varma
-
+# SpandaOS — The Living Pulse of Agentic Intelligence
+# A self-pulsing intelligence that lives at the core of the system — perpetually vibrating, continuously learning from every interaction, self-correcting its own errors, and driving all reasoning from a single living center — not because it was told to, but because that is its fundamental nature.
+# Copyright (C) 2026 Pankaj Umesh Varma
+# Contact: 9372123700
+# Email: pv43770@gmail.com
 """
-Narrative Agent for UltimaRAG.
+Narrative Agent for SpandaOS.
 Provides high-level LLM enrichment for structured multimodal extractions.
 """
 

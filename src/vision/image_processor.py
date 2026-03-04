@@ -1,5 +1,8 @@
-# UltimaRAG — Multi-Agent RAG System
-# Copyright (C) 2026 Pankaj Varma
+# SpandaOS — The Living Pulse of Agentic Intelligence
+# A self-pulsing intelligence that lives at the core of the system — perpetually vibrating, continuously learning from every interaction, self-correcting its own errors, and driving all reasoning from a single living center — not because it was told to, but because that is its fundamental nature.
+# Copyright (C) 2026 Pankaj Umesh Varma
+# Contact: 9372123700
+# Email: pv43770@gmail.com
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +18,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-Image Processor for UltimaRAG (Upgraded to UltimaRAG Elite).
+Image Processor for SpandaOS (Upgraded to SpandaOS Elite).
 Handles image preprocessing, OCR, and SOTA vision perception.
 
 SOTA Features:
@@ -64,11 +67,11 @@ class ImageProcessor:
 
                 logger.info("Initializing EasyOCR reader...")
                 # Enable GPU acceleration only if CUDA is available
-                force_gpu = os.getenv("Ultima_FORCE_GPU", "false").lower() == "true"
+                force_gpu = os.getenv("SpandaOS_FORCE_GPU", "false").lower() == "true"
                 cuda_available = torch.cuda.is_available() or force_gpu
                 
                 if not torch.cuda.is_available() and force_gpu:
-                    logger.warning("EasyOCR: Ultima_FORCE_GPU is ON. Attempting GPU loading despite CUDA reporting False.")
+                    logger.warning("EasyOCR: SpandaOS_FORCE_GPU is ON. Attempting GPU loading despite CUDA reporting False.")
                 
                 # SOTA: Multi-language 'Global Core' configuration
                 self.ocr_reader = easyocr.Reader(['en', 'fr', 'es', 'de', 'it', 'pt'], gpu=cuda_available)
@@ -86,7 +89,7 @@ class ImageProcessor:
 
     async def _process_tiled(self, img: Image.Image, check_abort_fn: Optional[Callable] = None) -> str:
         """
-        SOTA Tiled Perception (UltimaRAG Guard).
+        SOTA Tiled Perception (SpandaOS Guard).
         Splits image into 2x2 grid and processes tiles SEQUENTIALLY to save VRAM.
         Now upgraded to perform High-Fidelity Knowledge Extraction directly.
         """
@@ -105,7 +108,7 @@ class ImageProcessor:
         quad_labels = ["Top-Left", "Top-Right", "Bottom-Left", "Bottom-Right"]
         
         # SOTA: Unified Enrichment Prompt for VLM
-        ENRICH_PROMPT = """You are **UltimaRAG's Knowledge Base Architect**.
+        ENRICH_PROMPT = """You are **SpandaOS's Knowledge Base Architect**.
 Describe this image quadrant with absolute precision. Extract all factual data, visual entities, and relationships. 
 Format as a standalone high-fidelity knowledge segment. Output ONLY the segment."""
 
@@ -187,7 +190,7 @@ Format as a standalone high-fidelity knowledge segment. Output ONLY the segment.
                 try:
                     # SOTA: Unified Enrichment Prompt for VLM phase
                     # This allows skipping the separate LLM enrichment pass for images.
-                    SYSTEM_PROMPT = """You are **UltimaRAG's Knowledge Base Architect**.
+                    SYSTEM_PROMPT = """You are **SpandaOS's Knowledge Base Architect**.
 Systematically transform this asset into a high-fidelity Knowledge Base segment. 
 Identify all factual data, textual elements, and visual relationships. 
 Organization: Descriptive paragraphs. Tone: Authoritative. 

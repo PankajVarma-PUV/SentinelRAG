@@ -1,5 +1,8 @@
-# UltimaRAG — Multi-Agent RAG System
-# Copyright (C) 2026 Pankaj Varma
+# SpandaOS — The Living Pulse of Agentic Intelligence
+# A self-pulsing intelligence that lives at the core of the system — perpetually vibrating, continuously learning from every interaction, self-correcting its own errors, and driving all reasoning from a single living center — not because it was told to, but because that is its fundamental nature.
+# Copyright (C) 2026 Pankaj Umesh Varma
+# Contact: 9372123700
+# Email: pv43770@gmail.com
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
@@ -45,7 +48,7 @@ class MultiStagePlanner:
             base_url=Config.ollama.BASE_URL,
             timeout=Config.ollama.TIMEOUT
         )
-        logger.info("Multi-Stage Execution Planner (UltimaRAG Edition) initialized")
+        logger.info("Multi-Stage Execution Planner (SpandaOS Edition) initialized")
 
     async def create_plan(self, query: str, intent: Intent, evidence: UnifiedEvidenceState) -> ExecutionPlan:
         """
@@ -69,7 +72,7 @@ class MultiStagePlanner:
         # For MULTI_TASK, we use gemma3:4b to decompose
         prompt = f"""
 <role>
-You are the UltimaRAG Strategic Architect. Decompose complex user requests into a high-fidelity execution DAG with integrated quality gates.
+You are the SpandaOS Strategic Architect. Decompose complex user requests into a high-fidelity execution DAG with integrated quality gates.
 </role>
 
 <user_input>

@@ -1,5 +1,8 @@
-# UltimaRAG — Multi-Agent RAG System
-# Copyright (C) 2026 Pankaj Varma
+# SpandaOS — The Living Pulse of Agentic Intelligence
+# A self-pulsing intelligence that lives at the core of the system — perpetually vibrating, continuously learning from every interaction, self-correcting its own errors, and driving all reasoning from a single living center — not because it was told to, but because that is its fundamental nature.
+# Copyright (C) 2026 Pankaj Umesh Varma
+# Contact: 9372123700
+# Email: pv43770@gmail.com
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +18,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-Core Configuration Module for UltimaRAG
+Core Configuration Module for SpandaOS
 Centralized configuration management with environment variable support.
 
 ALL performance-sensitive values are driven by environment variables.
@@ -263,7 +266,7 @@ class ContinuousLearningConfig:
 # SynthesisConfig has been intentionally REMOVED.
 # The iterative continuation loop (CONTINUE_PROMPT / MAX_CONTINUATION_LOOPS)
 # caused Context Inflation crashes on low-resource hardware (2048-ctx).
-# UltimaRAG now uses Single-Shot generation with a prompt Token Budget Guard.
+# SpandaOS now uses Single-Shot generation with a prompt Token Budget Guard.
 # Response quality is maintained via the Healer node in metacognitive_brain.py.
 
 
@@ -362,7 +365,7 @@ class PathConfig:
     MODELS_DIR: Path = BASE_DIR / "models"
     INDEXES_DIR: Path = MODELS_DIR / "indexes"
     CACHE_DIR: Path = BASE_DIR / "cache"
-    Ultima_DB_DIR: Path = DATA_DIR / "Ultima_db"
+    SpandaOS_DB_DIR: Path = DATA_DIR / "SpandaOS"
     STORAGE_DIR: Path = DATA_DIR  # Used by ReflectionAgent for system_guidelines.json
 
     @classmethod

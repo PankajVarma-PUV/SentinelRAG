@@ -1,5 +1,8 @@
-# UltimaRAG — Multi-Agent RAG System
-# Copyright (C) 2026 Pankaj Varma
+# SpandaOS — The Living Pulse of Agentic Intelligence
+# A self-pulsing intelligence that lives at the core of the system — perpetually vibrating, continuously learning from every interaction, self-correcting its own errors, and driving all reasoning from a single living center — not because it was told to, but because that is its fundamental nature.
+# Copyright (C) 2026 Pankaj Umesh Varma
+# Contact: 9372123700
+# Email: pv43770@gmail.com
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +18,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-UltimaRAG Conversation-to-PDF Exporter
+SpandaOS Conversation-to-PDF Exporter
 Generates structured PDF documents from conversation history with full Unicode support.
 """
 
@@ -31,7 +34,7 @@ from .utils import logger
 
 
 class ConversationPDF(FPDF):
-    """SOTA Custom PDF generator with UltimaRAG branding and Unicode support."""
+    """SOTA Custom PDF generator with SpandaOS branding and Unicode support."""
 
     def __init__(self):
         # SOTA: Explicit A4 Format (210 x 297mm)
@@ -123,7 +126,7 @@ class ConversationPDF(FPDF):
         self.set_xy(self.LEFT_MARGIN, 8)
         self.set_font(font_main, 'B', 9)
         self.set_text_color(100, 116, 139) # Muted text
-        self.cell(self.GRID_WIDTH / 2, 8, 'ULTIMARAG INTELLIGENCE DOSSIER', align='L')
+        self.cell(self.GRID_WIDTH / 2, 8, 'SpandaOS INTELLIGENCE DOSSIER', align='L')
         
         self.set_font(font_main, '', 8)
         self.cell(self.GRID_WIDTH / 2, 8, f'PAGE {self.page_no()}', align='R', ln=1)
@@ -190,14 +193,14 @@ class ConversationPDF(FPDF):
         self.set_y(-25)
         self.set_font(font_main, 'B', 8)
         self.set_text_color(148, 163, 184)
-        self.cell(0, 5, "AUTHENTicated ULTIMARAG SOTA INTEL", align='C', ln=1)
+        self.cell(0, 5, "AUTHENTicated SpandaOS SOTA INTEL", align='C', ln=1)
         self.cell(0, 5, "CONFIDENTIAL / INTERNAL USE ONLY", align='C', ln=1)
 
     def footer(self):
         self.set_y(-15)
         self.set_font('NirmalaUI' if self._has_unicode_font else 'Helvetica', 'I', 8)
         self.set_text_color(100, 116, 139)
-        self.cell(0, 10, f'Authenticated UltimaRAG Document - Page {self.page_no()}/{{nb}}', align='C')
+        self.cell(0, 10, f'Authenticated SpandaOS Document - Page {self.page_no()}/{{nb}}', align='C')
 
     def render_chat_bubble(self, role: str, content: str, metadata: Dict = None):
         """High-Contrast Investigation Section (Stable V3)."""
@@ -211,7 +214,7 @@ class ConversationPDF(FPDF):
         self.set_x(self.LEFT_MARGIN)
         self.set_font(font_main, 'B', 9)
         self.set_text_color(6, 182, 212) if not is_user else self.set_text_color(100, 116, 139)
-        label = "INVESTIGATIVE PROMPT" if is_user else "ULTIMARAG INTELLIGENCE"
+        label = "INVESTIGATIVE PROMPT" if is_user else "SpandaOS INTELLIGENCE"
         self.multi_cell(self.GRID_WIDTH, 8, label, align='L')
         
         # 2. Content Block
@@ -400,7 +403,7 @@ def generate_query_pdf(
     response: str,
     conversation_id: str,
     mentioned_files: Optional[List[str]] = None,
-    conversation_title: str = "UltimaRAG Intelligence Export"
+    conversation_title: str = "SpandaOS Intelligence Export"
 ) -> bytes:
     """
     Generate a branded, Unicode-capable PDF for a specific query and its AI response.
@@ -450,7 +453,7 @@ def generate_query_pdf(
 
     pdf.set_font(font_main, 'I', 8)
     pdf.set_text_color(148, 163, 184)
-    pdf.cell(0, 5, f"Certified UltimaRAG Intelligence Document  |  Generated: {now_str}", ln=1, align='C')
+    pdf.cell(0, 5, f"Certified SpandaOS Intelligence Document  |  Generated: {now_str}", ln=1, align='C')
 
     return pdf.output()
 

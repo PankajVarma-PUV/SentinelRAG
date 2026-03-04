@@ -1,5 +1,8 @@
-# UltimaRAG — Multi-Agent RAG System
-# Copyright (C) 2026 Pankaj Varma
+# SpandaOS — The Living Pulse of Agentic Intelligence
+# A self-pulsing intelligence that lives at the core of the system — perpetually vibrating, continuously learning from every interaction, self-correcting its own errors, and driving all reasoning from a single living center — not because it was told to, but because that is its fundamental nature.
+# Copyright (C) 2026 Pankaj Umesh Varma
+# Contact: 9372123700
+# Email: pv43770@gmail.com
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
@@ -25,7 +28,7 @@ from .file_manager import ensure_chat_dir
 from ..vision.qwen_agent import get_vision_agent
 
 class DocumentProcessor:
-    """SOTA Document Processor for UltimaRAG. Extracts text and images from PDFs."""
+    """SOTA Document Processor for SpandaOS. Extracts text and images from PDFs."""
     
     @staticmethod
     async def extract_from_pdf(conversation_id: str, file_path: str, file_name: str, check_abort_fn: Optional[Callable] = None) -> Tuple[str, List[Dict]]:

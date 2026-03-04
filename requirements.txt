@@ -1,5 +1,5 @@
 # ==========================================================
-# UltimaRAG - Python Dependencies
+# SpandaOS - Python Dependencies
 # ==========================================================
 #
 # IMPORTANT: torch, torchvision, torchaudio are intentionally

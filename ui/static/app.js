@@ -1,5 +1,26 @@
 /*
- * UltimaRAG — Multi-Agent RAG System
+ * SpandaOS — The Living Pulse of Agentic Intelligence
+ * A self-pulsing intelligence that lives at the core of the system — perpetually vibrating, continuously learning from every interaction, self-correcting its own errors, and driving all reasoning from a single living center — not because it was told to, but because that is its fundamental nature.
+ * Copyright (C) 2026 Pankaj Umesh Varma
+ * Contact: 9372123700
+ * Email: pv43770@gmail.com
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+/*
+ * SpandaOS — Multi-Agent RAG System
  * Copyright (C) 2026 Pankaj Varma
  *
  * This program is free software: you can redistribute it and/or modify
@@ -17,11 +38,11 @@
  */
 
 /**
- * UltimaRAG SOTA Frontend Controller
+ * SpandaOS SOTA Frontend Controller
  * Logic for Workspace Explorer, Generative UI, and Adaptive Resonance
  */
 
-class UltimaApp {
+class SpandaOSApp {
     constructor() {
         this.state = {
             activeProject: 'default',
@@ -117,7 +138,7 @@ class UltimaApp {
         // [SOTA] Disable continuous UI polling for /health to avoid console spam.
         // We now fetch status strictly on-demand (e.g. init, file upload, chat switch).
         // setInterval(() => this.updateSystemStatus(), 30000);
-        console.log("UltimaRAG Metacognitive Core Interface Active.");
+        console.log("SpandaOS Metacognitive Core Interface Active.");
     }
 
     setupEventListeners() {
@@ -302,7 +323,7 @@ class UltimaApp {
         this.chatLog.innerHTML = `
             <div class="max-w-3xl mx-auto bg-white/5 p-6 rounded-3xl border border-white/5 shadow-xl">
                 <div class="text-sm leading-relaxed">
-                    Welcome to <strong class="text-cyan-400">UltimaRAG</strong>. I am your metacognitive assistant.
+                    Welcome to <strong class="text-cyan-400">SpandaOS</strong>. I am your metacognitive assistant.
                     Upload documents or ask questions to begin reasoning with grounded evidence.
                 </div>
                 <div class="text-[10px] font-bold uppercase tracking-widest text-cyan-500/50 mt-4 flex items-center gap-2">
@@ -539,7 +560,7 @@ class UltimaApp {
             btn.classList.remove('web-toggle-active');
             btn.title = 'Web Search: OFF — enable to search the web as a fallback';
         }
-        console.log(`[UltimaRAG] Web Search toggle: ${this.state.webSearchEnabled ? 'ON' : 'OFF'}`);
+        console.log(`[SpandaOS] Web Search toggle: ${this.state.webSearchEnabled ? 'ON' : 'OFF'}`);
     }
 
     // --- Message Rendering ---
@@ -597,7 +618,7 @@ class UltimaApp {
                 const confPercent = Math.round(metadata.confidence_score * 100);
                 metaHtml = `
                 <div class="resonance-card">
-                    <div class="intent-pill">${metadata.intent || metadata.agent_type || 'Ultima'}</div>
+                    <div class="intent-pill">${metadata.intent || metadata.agent_type || 'SpandaOS'}</div>
                     <div class="text-[10px] font-bold opacity-40">Fidelity: ${confPercent}%</div>
                 </div>
             `;
@@ -688,7 +709,7 @@ class UltimaApp {
                         <span class="perception-tooltip-header">
                             <span class="flex items-center gap-2">
                                 <i class="fa-solid fa-eye text-[8px] animate-pulse"></i>
-                                <span>Ultima PERCEPTION: ${p.fileName}</span>
+                                <span>SpandaOS PERCEPTION: ${p.fileName}</span>
                             </span>
                         </span>
                         <span class="perception-tooltip-body">${tooltipContent}</span>
@@ -1028,7 +1049,7 @@ class UltimaApp {
                                     this.hideUnifiedOverlay();
                                     this.showThinkingIndicator();
                                     this.showTelemetryHud();
-                                    this.updateTelemetry('Ultima', 'Starting Reasoning Analysis...');
+                                    this.updateTelemetry('SpandaOS', 'Starting Reasoning Analysis...');
                                 }
 
                             } else if (data.stage === 'workspace_updated') {
@@ -1149,7 +1170,7 @@ class UltimaApp {
                     confPercent = Math.round(data.confidence_score * 100);
                 }
 
-                const intent = data.intent || data.agent_type || (data.ui_hints ? data.ui_hints.intent : null) || 'Ultima';
+                const intent = data.intent || data.agent_type || (data.ui_hints ? data.ui_hints.intent : null) || 'SpandaOS';
 
                 metaContainer.innerHTML = `
                     <div class="resonance-card">
@@ -1207,11 +1228,23 @@ class UltimaApp {
                     if (!isSummarize && !isAgenticAction && !isGeneral && retrievedKnowledge) {
                         this.injectActionButtons(bubble);
                     }
+
+                    // ── SELF-LEARNING FEEDBACK BAR: Always inject for real AI responses ──
+                    // Skip for system events (TERMINATED, FIREWALL_BLOCKED, IDENTITY)
+                    const isSystemEvent = ['TERMINATED', 'FIREWALL_BLOCKED', 'IDENTITY'].includes(intent);
+                    if (!isSystemEvent) {
+                        this.injectFeedbackBar(bubble, wrapper);
+                    }
                 }
                 // ── SOURCE EXPLORER: Attach per-response data to wrapper for openArtifact() ──
                 if (data && data.retrieved_fragments && Object.keys(data.retrieved_fragments).length > 0) {
                     wrapper.dataset.retrievedFragments = JSON.stringify(data.retrieved_fragments);
                     wrapper.dataset.sourceMap = JSON.stringify(data.source_map || {});
+                }
+                // ── FEEDBACK: Store query + response for the feedback POST payload ──
+                if (data) {
+                    wrapper.dataset.feedbackQuery = data.query || data.original_query || '';
+                    wrapper.dataset.feedbackResponse = (finalContent || '').substring(0, 2000); // cap at 2000 chars
                 }
                 // ────────────────────────────────────────────────────────────────
                 updateMetadata(data);
@@ -1317,6 +1350,75 @@ class UltimaApp {
         this.userInput.dispatchEvent(new Event('input', { bubbles: true }));
     }
 
+    // ── SELF-LEARNING FEEDBACK BAR ────────────────────────────────────────
+    // Injects a compact thumbs up / thumbs down bar below each AI response.
+    // Thumbs down triggers the continuous learning loop (ReflectionAgent).
+
+    injectFeedbackBar(container, wrapper) {
+        // Only inject once per bubble
+        if (container.querySelector('.feedback-bar')) return;
+        const bar = document.createElement('div');
+        bar.className = 'feedback-bar';
+        bar.dataset.state = 'idle';
+        bar.innerHTML = `
+            <span class="feedback-label">Was this helpful?</span>
+            <div class="feedback-btns">
+                <button class="feedback-btn thumbs-up" title="Good response"
+                    onclick="window.app.sendFeedback(this, 1)">
+                    <i class="fa-solid fa-thumbs-up"></i>
+                </button>
+                <button class="feedback-btn thumbs-down" title="Needs improvement"
+                    onclick="window.app.sendFeedback(this, -1)">
+                    <i class="fa-solid fa-thumbs-down"></i>
+                </button>
+            </div>
+        `;
+        container.appendChild(bar);
+    }
+
+    async sendFeedback(btn, score) {
+        const bar = btn.closest('.feedback-bar');
+        if (!bar || bar.dataset.state === 'submitted') return;
+
+        // Walk up DOM to the wrapper element that holds data-feedback-* attributes
+        const wrapper = bar.closest('[data-feedback-response]') ||
+                        bar.closest('.max-w-3xl');
+
+        const query = wrapper?.dataset.feedbackQuery || '';
+        const response = wrapper?.dataset.feedbackResponse || '';
+        const convId = this.state.activeConversation;
+
+        // Immediate visual feedback — disable both buttons and colour the clicked one
+        bar.querySelectorAll('.feedback-btn').forEach(b => { b.disabled = true; });
+        btn.classList.add(score > 0 ? 'feedback-positive' : 'feedback-negative');
+        bar.dataset.state = 'submitted';
+
+        try {
+            await fetch('/query/feedback', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    query, response, score,
+                    conversation_id: convId
+                })
+            });
+        } catch(e) {
+            console.error('[Feedback] POST failed:', e);
+        }
+
+        // Show confirmation
+        const label = bar.querySelector('.feedback-label');
+        if (label) {
+            label.textContent = score > 0
+                ? '✓ Thanks for the positive feedback!'
+                : '✓ Got it — we\'ll learn from this.';
+        }
+
+        if (score < 0) {
+            console.log('[SpandaOS] Thumbs-down sent — learning loop triggered.');
+        }
+    }
+
     // ── Phase 1: Agentic Action Trigger ─────────────────────────────────
     async triggerAgenticAction(intentType, barEl) {
         if (this.state.isProcessing) return;
@@ -1379,7 +1481,7 @@ class UltimaApp {
                         const data = JSON.parse(line.substring(6));
 
                         if (data.stage === 'initializing') {
-                            this.updateTelemetry('Ultima', `${intentType.replace('_', ' ')} pipeline starting...`);
+                            this.updateTelemetry('SpandaOS', `${intentType.replace('_', ' ')} pipeline starting...`);
 
                         } else if (data.stage === 'agentic_user_msg') {
                             // Phase 1: Show the synthetic user message in chat
@@ -1387,7 +1489,7 @@ class UltimaApp {
                             this.appendMessage('user', data.message);
 
                         } else if (data.stage === 'processing') {
-                            this.updateTelemetry(data.agent || 'Ultima', data.message || 'Processing...');
+                            this.updateTelemetry(data.agent || 'SpandaOS', data.message || 'Processing...');
 
                         } else if (data.type === 'thought') {
                             if (!aiBubble) aiBubble = this.createAiBubble();
@@ -1655,7 +1757,7 @@ class UltimaApp {
         this.ws = new WebSocket(wsUrl);
 
         this.ws.onopen = () => {
-            console.log("🔌 Connected to Ultima SOTA Telemetry Socket");
+            console.log("🔌 Connected to SpandaOS SOTA Telemetry Socket");
             // Ping loop to keep connection alive
             this.pingInterval = setInterval(() => {
                 if (this.ws.readyState === WebSocket.OPEN) this.ws.send("ping");
@@ -1994,7 +2096,7 @@ class UltimaApp {
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `Ultima_Evidence_${sourceName.replace(/\.[^/.]+$/, "")}.pdf`;
+            a.download = `SpandaOS_Evidence_${sourceName.replace(/\.[^/.]+$/, "")}.pdf`;
             document.body.appendChild(a);
             a.click();
             a.remove();
@@ -2399,7 +2501,7 @@ class UltimaApp {
             a.href = url;
             const cd = resp.headers.get('Content-Disposition');
             const match = cd ? cd.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/) : null;
-            a.download = match ? match[1].replace(/['"]/g, '') : 'UltimaRAG_Conversation.pdf';
+            a.download = match ? match[1].replace(/['"]/g, '') : 'SpandaOS_Conversation.pdf';
             document.body.appendChild(a);
             a.click();
             a.remove();
@@ -2489,7 +2591,7 @@ class UltimaApp {
             a.href = url;
             const cd = resp.headers.get('Content-Disposition');
             const match = cd ? cd.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/) : null;
-            a.download = match ? match[1].replace(/['"]/g, '') : 'UltimaRAG_QueryExport.pdf';
+            a.download = match ? match[1].replace(/['"]/g, '') : 'SpandaOS_QueryExport.pdf';
             document.body.appendChild(a);
             a.click();
             a.remove();
@@ -2699,17 +2801,17 @@ function closeFileViewer() {
 }
 
 // SOTA Phase 4: Purge Level 10 (Cache Busting)
-const Ultima_VERSION = "4.0.0-REV-ULTRA";
+const SpandaOS_VERSION = "4.0.0-REV-ULTRA";
 
 window.addEventListener('load', () => {
-    console.log(`%c Ultima RAG CORE: ${Ultima_VERSION} ACTIVE %c`, "background:#00d9ff; color:#000; font-weight:bold; padding:4px;", "");
-    window.app = new UltimaApp();
+    console.log(`%c SpandaOS CORE: ${SpandaOS_VERSION} ACTIVE %c`, "background:#00d9ff; color:#000; font-weight:bold; padding:4px;", "");
+    window.app = new SpandaOSApp();
 
     // Auto-purge old state if version mismatch detected (Simulated)
-    const lastVer = localStorage.getItem('Ultima_version');
-    if (lastVer !== Ultima_VERSION) {
-        console.warn("Ultima: Version shift detected. Purging legacy cognitive cache.");
-        localStorage.setItem('Ultima_version', Ultima_VERSION);
+    const lastVer = localStorage.getItem('SpandaOS_version');
+    if (lastVer !== SpandaOS_VERSION) {
+        console.warn("SpandaOS: Version shift detected. Purging legacy cognitive cache.");
+        localStorage.setItem('SpandaOS_version', SpandaOS_VERSION);
     }
 });
 

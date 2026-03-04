@@ -1,6 +1,9 @@
 @echo off
-:: UltimaRAG — Multi-Agent RAG System
-:: Copyright (C) 2026 Pankaj Varma
+:: SpandaOS — The Living Pulse of Agentic Intelligence
+:: A self-pulsing intelligence that lives at the core of the system — perpetually vibrating, continuously learning from every interaction, self-correcting its own errors, and driving all reasoning from a single living center — not because it was told to, but because that is its fundamental nature.
+:: Copyright (C) 2026 Pankaj Umesh Varma
+:: Contact: 9372123700
+:: Email: pv43770@gmail.com
 ::
 :: This program is free software: you can redistribute it and/or modify
 :: it under the terms of the GNU Affero General Public License as published by
@@ -18,13 +21,13 @@
 SETLOCAL EnableDelayedExpansion
 
 :: --- CONFIGURATION ---
-SET REPO_URL=https://github.com/PankajVarma-PUV/UltimaRAG.git
+SET REPO_URL=https://github.com/PankajVarma-PUV/SpandaOS.git
 SET BRANCH=main
 
 :: Use UTF-8 for better character support in modern CMD/PowerShell
 chcp 65001 >nul
 
-echo 🛡️ UltimaRAG GitHub Recovery Uploader
+echo 🛡️ SpandaOS GitHub Recovery Uploader
 echo ---------------------------------------
 
 :: 1. Force Cleanup of any stuck background processes
@@ -50,7 +53,7 @@ git add -A
 
 :: 5. Commit with robust quoting
 SET /P commit_msg="💬 Enter commit message (or press enter for default): "
-if "%commit_msg%"=="" SET commit_msg=Finalized SOTA UltimaRAG Architecture
+if "%commit_msg%"=="" SET commit_msg=Finalized SOTA SpandaOS Architecture
 
 echo 💾 Committing...
 git commit -m "%commit_msg%"
@@ -67,7 +70,7 @@ git push -u origin %BRANCH% --force
 if %errorlevel% equ 0 (
     echo ---------------------------------------
     echo ✅ SUCCESS! Your entire LOCAL codebase is now live on GitHub.
-    echo 🌐 Visit: https://github.com/PankajVarma-PUV/UltimaRAG
+    echo 🌐 Visit: https://github.com/PankajVarma-PUV/SpandaOS
 ) else (
     echo -----------------------------------
     echo ❌ FAILED to push. 

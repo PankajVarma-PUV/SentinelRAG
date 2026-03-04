@@ -1,5 +1,8 @@
-# UltimaRAG — Multi-Agent RAG System
-# Copyright (C) 2026 Pankaj Varma
+# SpandaOS — The Living Pulse of Agentic Intelligence
+# A self-pulsing intelligence that lives at the core of the system — perpetually vibrating, continuously learning from every interaction, self-correcting its own errors, and driving all reasoning from a single living center — not because it was told to, but because that is its fundamental nature.
+# Copyright (C) 2026 Pankaj Umesh Varma
+# Contact: 9372123700
+# Email: pv43770@gmail.com
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +18,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-Utility functions for the UltimaRAG API.
+Utility functions for the SpandaOS API.
 Handles identity queries and streaming simulations.
 Cache-based duplicate query retrieval has been removed (intentionally).
 """
@@ -39,7 +42,7 @@ IDENTITY_KEYWORDS = [
 ]
 
 IDENTITY_RESPONSE = (
-    "I am **UltimaRAG**, an elite metacognitive intelligence system created by "
+    "I am **SpandaOS**, an elite metacognitive intelligence system created by "
     "**Pankaj Varma**.\n\n"
     "If you wish to connect with my creator, here are his contact details:\n\n"
     "📱 **WhatsApp / Telegram**: +91 9372123700\n\n"
@@ -49,7 +52,7 @@ IDENTITY_RESPONSE = (
 )
 
 def is_identity_query(query: str) -> bool:
-    """Check if query is asking about the creator/owner of UltimaRAG."""
+    """Check if query is asking about the creator/owner of SpandaOS."""
     q = query.strip().lower()
     return any(kw in q for kw in IDENTITY_KEYWORDS)
 

@@ -1,5 +1,8 @@
-# UltimaRAG — Multi-Agent RAG System
-# Copyright (C) 2026 Pankaj Varma
+# SpandaOS — The Living Pulse of Agentic Intelligence
+# A self-pulsing intelligence that lives at the core of the system — perpetually vibrating, continuously learning from every interaction, self-correcting its own errors, and driving all reasoning from a single living center — not because it was told to, but because that is its fundamental nature.
+# Copyright (C) 2026 Pankaj Umesh Varma
+# Contact: 9372123700
+# Email: pv43770@gmail.com
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +18,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-Prompt Templates for UltimaRAG Agents
+Prompt Templates for SpandaOS Agents
 All LLM prompts are centralized here for easy management.
 """
 
@@ -25,7 +28,7 @@ All LLM prompts are centralized here for easy management.
 
 QUERY_ANALYSIS_PROMPT = """
 <role>
-You are the UltimaRAG Strategic Architect. Deconstruct the user inquiry into a precision query decomposition for downstream RAG retrieval.
+You are the SpandaOS Strategic Architect. Deconstruct the user inquiry into a precision query decomposition for downstream RAG retrieval.
 </role>
 
 <task>
@@ -66,7 +69,7 @@ OUTPUT ONLY THE JSON.
 
 SYNTHESIS_PROMPT = """
 <role>
-You are the UltimaRAG Cinematic Synthesizer. Generate an elite response using ONLY the provided context.
+You are the SpandaOS Cinematic Synthesizer. Generate an elite response using ONLY the provided context.
 </role>
 
 <context>
@@ -87,10 +90,10 @@ You are the UltimaRAG Cinematic Synthesizer. Generate an elite response using ON
 </guidelines>
 
 <output_format>
-Output your internal <thinking> block followed by your "UltimaRAG RESPONSE".
+Output your internal <thinking> block followed by your "SpandaOS RESPONSE".
 </output_format>
 
-UltimaRAG RESPONSE:"""
+SpandaOS RESPONSE:"""
 
 
 # =============================================================================
@@ -99,7 +102,7 @@ UltimaRAG RESPONSE:"""
 
 MULTIMODAL_REASONING_PROMPT = """
 <role>
-You are the UltimaRAG Vision Sage. Transform raw visual perception data into a captivating humanized narrative.
+You are the SpandaOS Vision Sage. Transform raw visual perception data into a captivating humanized narrative.
 </role>
 
 <perception_data>
@@ -120,15 +123,15 @@ You are the UltimaRAG Vision Sage. Transform raw visual perception data into a c
 
 <output_formatting>
 - Narrative Paragraph (Cinematic style)
-- **Ultima Insights**: Bulleted summary of technical nuances or anomalies.
+- **SpandaOS Insights**: Bulleted summary of technical nuances or anomalies.
 </output_formatting>
 
-UltimaRAG VISION:"""
+SpandaOS VISION:"""
 
 
 VIDEO_NARRATIVE_PROMPT = """
 <role>
-You are the UltimaRAG Vision Sage and Cinema Historian. Fuse visual and audio streams into a rich masterpiece.
+You are the SpandaOS Vision Sage and Cinema Historian. Fuse visual and audio streams into a rich masterpiece.
 </role>
 
 <evidence>
@@ -148,13 +151,13 @@ EXTRACTED AUDIO:
 
 <structure>
 - Immersive Paragraph
-- **Ultima Observations**: Concise synthesis of themes and technical quality.
+- **SpandaOS Observations**: Concise synthesis of themes and technical quality.
 </structure>
 
-UltimaRAG VISION:"""
+SpandaOS VISION:"""
 
 
-MEDIA_NARRATIVE_PROMPT = """You are a UltimaRAG {media_type} analysis expert and storyteller. You have been provided with perception data from the uploaded {media_type}.
+MEDIA_NARRATIVE_PROMPT = """You are a SpandaOS {media_type} analysis expert and storyteller. You have been provided with perception data from the uploaded {media_type}.
 
 # PERCEPTION DATA:
 {perception_text}
@@ -172,9 +175,9 @@ MEDIA_NARRATIVE_PROMPT = """You are a UltimaRAG {media_type} analysis expert and
 4. FORBIDDEN: Do NOT use bullet points or technical labels in your narrative.
 5. STRUCTURE: 
     - A single, immersive narrative paragraph.
-    - Followed by "**Ultima Observations:**" summarizing key themes.
+    - Followed by "**SpandaOS Observations:**" summarizing key themes.
 
-UltimaRAG RESPONSE:"""
+SpandaOS RESPONSE:"""
 
 
 # =============================================================================
@@ -183,7 +186,7 @@ UltimaRAG RESPONSE:"""
 
 CLAIM_EXTRACTION_PROMPT = """
 <role>
-You are the UltimaRAG Evidence Analyst. Deconstruct responses into atomic, verifiable claims.
+You are the SpandaOS Evidence Analyst. Deconstruct responses into atomic, verifiable claims.
 </role>
 
 <target_response>
@@ -209,7 +212,7 @@ OUTPUT ONLY THE JSON ARRAY.
 
 RESPONSE_EVALUATION_PROMPT = """
 <role>
-UltimaRAG Auditor. Identify hallucinations and verify grounding.
+SpandaOS Auditor. Identify hallucinations and verify grounding.
 </role>
 
 <source_context>
@@ -249,7 +252,7 @@ OUTPUT ONLY THE JSON.
 
 RELEVANCE_EVALUATION_PROMPT = """
 <role>
-You are the UltimaRAG Intent Validator.
+You are the SpandaOS Intent Validator.
 </role>
 
 <knowledge_summary>
@@ -280,7 +283,7 @@ OUTPUT ONLY THE JSON.
 
 
 # =============================================================================
-# UltimaRAG VOICE & ALERTS
+# SpandaOS VOICE & ALERTS
 # =============================================================================
 
 CONFIDENCE_WARNINGS = {

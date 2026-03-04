@@ -1,11 +1,11 @@
-# UltimaRAG: The Complete Deep-Dive Guide to AI Agents
+# SpandaOS: The Complete Deep-Dive Guide to AI Agents
 > **Version:** Post-Audit v2 (2026-02-28) — Continuous learning loop CLOSED.
 > **Status:** ✅ Trustworthy source of truth. All "listens to / reports to" fields verified in code.
 
-Welcome to the **UltimaRAG Multi-Agent Architecture Guide**. This document describes all 27 specialized AI agents exactly as they exist in the current codebase — not as originally designed.
+Welcome to the **SpandaOS Multi-Agent Architecture Guide**. This document describes all 27 specialized AI agents exactly as they exist in the current codebase — not as originally designed.
 
 We have organized them into two sections:
-* **Section 1 (The Senses & Foundation):** Background agents that process files on upload. They use Hugging Face, PyTorch, and local inference to give UltimaRAG "eyes and ears."
+* **Section 1 (The Senses & Foundation):** Background agents that process files on upload. They use Hugging Face, PyTorch, and local inference to give SpandaOS "eyes and ears."
 * **Section 2 (The Thinking Mind):** Query-time agents orchestrated by the LangGraph `MetacognitiveBrain`. Most operate as **nodes in the LangGraph StateGraph**, not as standalone programs.
 
 ---
@@ -14,7 +14,7 @@ We have organized them into two sections:
 >
 > In the documented design, agents were described as a "linear assembly line."
 > The actual implementation uses a **LangGraph StateGraph** (in `metacognitive_brain.py`).
-> Most thinking agents are **graph nodes** that receive and return a shared `UltimaRAGState` dict.
+> Most thinking agents are **graph nodes** that receive and return a shared `SpandaOSState` dict.
 > Communication happens through state mutation, not direct function calls between agent objects.
 >
 > Two agents run **outside the graph** as API-layer middleware: `PromptFirewall` and `IdentityAgent`.
@@ -39,7 +39,7 @@ These 5 agents run entirely in the background when files are uploaded. They are 
 ---
 
 ## 2. Multilingual OCR Agent (The Reader)
-* **Engine Used:** `EasyOCR` (PyTorch backend, GPU-accelerated if `Ultima_FORCE_GPU` env var is set)
+* **Engine Used:** `EasyOCR` (PyTorch backend, GPU-accelerated if `SpandaOS_FORCE_GPU` env var is set)
 * **File:** `src/vision/image_processor.py` — internal to `ImageProcessor`, not a separate class
 * **Purpose:** Extracts text from images and embedded PDF pages using bounding-box detection.
 * **How it Works:** `ImageProcessor.extract_text()` runs EasyOCR internally using a tiled-scanning approach for large images. Supports 6 core languages (`en`, `hi`, `fr`, `de`, `es`, `zh`).
@@ -76,7 +76,7 @@ These 5 agents run entirely in the background when files are uploaded. They are 
 * **Purpose:** Converts text chunks into mathematical embedding vectors for semantic search.
 * **How it Works:** Uses `sentence-transformers` with a hashing-based deterministic cache — identical text always produces identical vectors, preventing duplicate embeddings and ensuring reproducible search results.
 * **📥 Listens To (Inputs):** `DocumentChunker` output (called from the `/index` API endpoint after chunking)
-* **📤 Reports To (Outputs):** LanceDB vector database via `UltimaRAGDatabase.add_knowledge()`
+* **📤 Reports To (Outputs):** LanceDB vector database via `SpandaOSDatabase.add_knowledge()`
 
 ---
 
@@ -86,7 +86,7 @@ These 5 agents run entirely in the background when files are uploaded. They are 
 * **Purpose:** Refines raw vector search results by deeply scoring each chunk's relevance to the specific query.
 * **How it Works:** `RetrieverAgent.retrieve()` loads and runs a CrossEncoder inline to score each retrieved chunk from 0 to 1. Multimodal evidence chunks are protected from being discarded.
 * **📥 Listens To (Inputs):** LanceDB hybrid search results (vector + BM25)
-* **📤 Reports To (Outputs):** The `retrieval` LangGraph node in `MetacognitiveBrain`, which places the ranked evidence into `UltimaRAGState["evidence"]`
+* **📤 Reports To (Outputs):** The `retrieval` LangGraph node in `MetacognitiveBrain`, which places the ranked evidence into `SpandaOSState["evidence"]`
 * **⚠️ Note:** A separate `src/agents/reranker.py` (`RerankerModule`) was implemented but is **not wired into the production path** (archived). The actual reranking happens inline inside `RetrieverAgent`.
 
 ---
@@ -122,7 +122,7 @@ These 5 agents run entirely in the background when files are uploaded. They are 
 * **LangGraph Node:** `route_intent` (the `router` node)
 * **Purpose:** Classifies the query intent and decides the routing path through the LangGraph workflow.
 * **How it Works:** Uses an Ollama LLM to classify queries into: `RAG`, `PERCEPTION`, `GENERAL`, `MULTI_TASK`, or `HISTORY_RECALL`. Also performs `@mention` file parsing and target language detection.
-* **📥 Listens To (Inputs):** `UltimaRAGState` after the `extractor` node runs
+* **📥 Listens To (Inputs):** `SpandaOSState` after the `extractor` node runs
 * **📤 Reports To (Outputs):** The `decide_path()` conditional edge in LangGraph, which routes to `planner`, `chronicler`, or other nodes based on intent
 
 ---
@@ -143,8 +143,8 @@ These 5 agents run entirely in the background when files are uploaded. They are 
 * **File:** `src/agents/fusion_extractor.py` — Class: `UniversalFusionExtractor`
 * **LangGraph Node:** `extractor` (first node in the graph)
 * **Purpose:** Aggregates and organizes all available evidence (document chunks, visual perceptions, audio transcripts) from the conversation and file context into a unified state object.
-* **How it Works:** Collects raw document chunks, enriched media narratives, and prior retrieval results. Organizes them into `text_evidence`, `visual_evidence`, and `audio_evidence` buckets within `UltimaRAGState["unified_evidence"]`.
-* **📥 Listens To (Inputs):** Initial `UltimaRAGState` (first node to run)
+* **How it Works:** Collects raw document chunks, enriched media narratives, and prior retrieval results. Organizes them into `text_evidence`, `visual_evidence`, and `audio_evidence` buckets within `SpandaOSState["unified_evidence"]`.
+* **📥 Listens To (Inputs):** Initial `SpandaOSState` (first node to run)
 * **📤 Reports To (Outputs):** `IntentClassifier` (via `router` node after `extractor`)
 
 ---
@@ -200,7 +200,7 @@ These 5 agents run entirely in the background when files are uploaded. They are 
 * **Purpose:** Classifies response confidence and attaches quality metadata for the frontend Fidelity badge.
 * **How it Works:** Calculates a composite confidence score from the fact-checker output. Classifies into HIGH/MEDIUM/LOW/VERY_LOW and generates quality warnings. **Never blocks responses** — always shows the answer with transparency indicators.
 * **📥 Listens To (Inputs):** Final state after `healer` or `critic` (whichever was last)
-* **📤 Reports To (Outputs):** `UltimaRAGState["ui_hints"]` → frontend Fidelity badge and glow intensity
+* **📤 Reports To (Outputs):** `SpandaOSState["ui_hints"]` → frontend Fidelity badge and glow intensity
 * **⚠️ Note:** File is named `refusal_gate.py` for historical reasons. The class was renamed to `QualityIndicator` during the 2026-02-27 audit. `RefusalGate` remains as a backward-compatible alias.
 
 ---
@@ -256,7 +256,7 @@ These agents are triggered by clicking action buttons in the UI. They bypass the
 * **Purpose:** Retrieves semantically relevant context from past conversations using vector search over interaction history.
 * **How it Works:** For topic-specific recall queries, vector-searches the conversation history to pull "memories" from previous turns. For full-context queries, returns recent turns with MemGPT overflow guard (pages out oldest turn when context budget exceeded).
 * **📥 Listens To (Inputs):** `router` node (only on `HISTORY_RECALL` intent)
-* **📤 Reports To (Outputs):** `chronicler` node with `UltimaRAGState["full_history"]` populated
+* **📤 Reports To (Outputs):** `chronicler` node with `SpandaOSState["full_history"]` populated
 
 ---
 
@@ -266,8 +266,8 @@ These agents are triggered by clicking action buttons in the UI. They bypass the
 * **LangGraph Node:** `chronicler`
 * **Purpose:** Synthesizes retrieved conversation history into a coherent humanized summary that answers history-based questions.
 * **How it Works:** Compresses older chat logs into a dense semantic narrative. Supports `target_language` for multilingual history summaries. Only triggered when intent is `HISTORY_RECALL`.
-* **📥 Listens To (Inputs):** `retrieve_full_history` node (receives `UltimaRAGState["full_history"]`)
-* **📤 Reports To (Outputs):** `UltimaRAGState["answer"]` directly → final response (bypasses synthesis/critic)
+* **📥 Listens To (Inputs):** `retrieve_full_history` node (receives `SpandaOSState["full_history"]`)
+* **📤 Reports To (Outputs):** `SpandaOSState["answer"]` directly → final response (bypasses synthesis/critic)
 
 ---
 
@@ -288,7 +288,7 @@ These agents are triggered by clicking action buttons in the UI. They bypass the
 * **Purpose:** Expands a single query into multiple retrieval variants to bridge logical gaps across documents.
 * **How it Works:** Uses Chain-of-Thought (CoT) prompting to generate 3 query variations that cover different aspects of the question (definitions, comparisons, practical implications). All variants are retrieved and their evidence merged.
 * **📥 Listens To (Inputs):** `planner` node (for RAG-path queries with complex intent)
-* **📤 Reports To (Outputs):** `RetrieverAgent` (called for each query variant), results merged into `UltimaRAGState["evidence"]`
+* **📤 Reports To (Outputs):** `RetrieverAgent` (called for each query variant), results merged into `SpandaOSState["evidence"]`
 * **⚠️ Note:** The separate `QueryAnalyzer` class (`query_analyzer.py`) implemented this feature but was never wired in — archived. This functionality is implemented inline in the Brain.
 
 ---

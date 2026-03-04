@@ -1,5 +1,8 @@
-# UltimaRAG — Multi-Agent RAG System
-# Copyright (C) 2026 Pankaj Varma
+# SpandaOS — The Living Pulse of Agentic Intelligence
+# A self-pulsing intelligence that lives at the core of the system — perpetually vibrating, continuously learning from every interaction, self-correcting its own errors, and driving all reasoning from a single living center — not because it was told to, but because that is its fundamental nature.
+# Copyright (C) 2026 Pankaj Umesh Varma
+# Contact: 9372123700
+# Email: pv43770@gmail.com
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
@@ -130,7 +133,7 @@ class DeepInsightAgent:
         yield {"type": "thought", "agent": "🔬 Analyst", "action": "Drafting initial analysis from evidence..."}
 
         analyst_prompt = f"""<role>
-You are the UltimaRAG Analyst — a world-class evidence analyst. Your task is to produce a thorough, structured first-pass analysis of the provided document context.
+You are the SpandaOS Analyst — a world-class evidence analyst. Your task is to produce a thorough, structured first-pass analysis of the provided document context.
 </role>
 
 <system_info>
@@ -171,7 +174,7 @@ ANALYST REPORT:"""
         yield {"type": "thought", "agent": "⚔️ Skeptic", "action": "Challenging the analyst's conclusions..."}
 
         skeptic_prompt = f"""<role>
-You are the UltimaRAG Skeptic — a rigorous devil's advocate. You have received an analyst's first-pass report and must identify its weaknesses, unsupported claims, and alternative interpretations.
+You are the SpandaOS Skeptic — a rigorous devil's advocate. You have received an analyst's first-pass report and must identify its weaknesses, unsupported claims, and alternative interpretations.
 </role>
 
 <system_info>
@@ -212,7 +215,7 @@ SKEPTIC CRITIQUE:"""
         yield {"type": "thought", "agent": "✨ Synthesizer", "action": "Forging final peer-reviewed insight from debate..."}
 
         synthesizer_prompt = f"""<role>
-You are the UltimaRAG Synthesizer — the final arbitrator of intellectual debate. You have received an analyst's initial report and a skeptic's critique. Your task is to forge a final, authoritative, deeply nuanced insight that is stronger than either individual perspective.
+You are the SpandaOS Synthesizer — the final arbitrator of intellectual debate. You have received an analyst's initial report and a skeptic's critique. Your task is to forge a final, authoritative, deeply nuanced insight that is stronger than either individual perspective.
 </role>
 
 <system_info>
@@ -238,7 +241,7 @@ STAGE: SYNTHESIZER (Pass 3 of 3 — FINAL)
 6. LENGTH: 400-600 words of final synthesized insight.
 </synthesizer_mandates>
 
-UltimaRAG DEEP INSIGHT:"""
+SpandaOS DEEP INSIGHT:"""
 
         # Stream the synthesizer response token by token (final output visible to user)
         final_content = ""
@@ -256,7 +259,7 @@ UltimaRAG DEEP INSIGHT:"""
             final_content = analyst_report  # graceful fallback to analyst report
 
         final_content = self._strip_thinking(final_content)
-        final_content = final_content.replace("UltimaRAG DEEP INSIGHT:", "").strip()
+        final_content = final_content.replace("SpandaOS DEEP INSIGHT:", "").strip()
 
         logger.info(f"DeepInsightAgent: Synthesis complete ({len(final_content)} chars)")
         yield {"type": "thought", "agent": "✨ Synthesizer", "action": "Peer-reviewed insight forged. Debate concluded."}

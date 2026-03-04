@@ -1,5 +1,8 @@
-# UltimaRAG — Multi-Agent RAG System
-# Copyright (C) 2026 Pankaj Varma
+# SpandaOS — The Living Pulse of Agentic Intelligence
+# A self-pulsing intelligence that lives at the core of the system — perpetually vibrating, continuously learning from every interaction, self-correcting its own errors, and driving all reasoning from a single living center — not because it was told to, but because that is its fundamental nature.
+# Copyright (C) 2026 Pankaj Umesh Varma
+# Contact: 9372123700
+# Email: pv43770@gmail.com
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
@@ -184,9 +187,9 @@ SCHEMA_REGISTRY = {
     ])
 }
 
-class UltimaRAGDatabase:
+class SpandaOSDatabase:
     """
-    SOTA Database Layer for UltimaRAG using LanceDB.
+    SOTA Database Layer for SpandaOS using LanceDB.
     Supports hierarchical organization (Projects/Folders) and Vector-native storage.
     
     INTEGRITY STANDARDS:
@@ -196,7 +199,7 @@ class UltimaRAGDatabase:
     """
     
     def __init__(self, db_path: Optional[Path] = None):
-        self.db_path = db_path or Config.paths.Ultima_DB_DIR
+        self.db_path = db_path or Config.paths.SpandaOS_DB_DIR
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self.conn = lancedb.connect(str(self.db_path))
         self._initialize_tables()
@@ -1638,13 +1641,13 @@ class UltimaRAGDatabase:
 _db_instance = None
 _db_lock = threading.Lock()
 
-def get_database() -> UltimaRAGDatabase:
-    """Get or create singleton UltimaRAGDatabase instance with thread safety."""
+def get_database() -> SpandaOSDatabase:
+    """Get or create singleton SpandaOSDatabase instance with thread safety."""
     global _db_instance
     if _db_instance is None:
         with _db_lock:
             # Double-check pattern
             if _db_instance is None:
-                _db_instance = UltimaRAGDatabase()
+                _db_instance = SpandaOSDatabase()
     return _db_instance
 

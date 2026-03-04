@@ -1,5 +1,8 @@
-# UltimaRAG — Multi-Agent RAG System
-# Copyright (C) 2026 Pankaj Varma
+# SpandaOS — The Living Pulse of Agentic Intelligence
+# A self-pulsing intelligence that lives at the core of the system — perpetually vibrating, continuously learning from every interaction, self-correcting its own errors, and driving all reasoning from a single living center — not because it was told to, but because that is its fundamental nature.
+# Copyright (C) 2026 Pankaj Umesh Varma
+# Contact: 9372123700
+# Email: pv43770@gmail.com
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +18,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-Content Enricher Agent for UltimaRAG.
+Content Enricher Agent for SpandaOS.
 Transforms raw extraction data into high-fidelity enriched narratives.
 Single Source of Truth (SSOT) Implementation.
 """
@@ -27,7 +30,7 @@ from ..core.utils import logger, Timer
 from ..core.config import Config
 
 ENRICHMENT_PROMPTS = {
-    "image": """You are **UltimaRAG's Knowledge Base Architect**.
+    "image": """You are **SpandaOS's Knowledge Base Architect**.
     
 RAW PERCEPTION DATA (OCR + VISION):
 {raw_content}
@@ -43,7 +46,7 @@ INSTRUCTIONS:
 
 OUTPUT: A definitive, well-structured knowledge segment capturing the totality of the asset.""",
 
-    "video": """You are **UltimaRAG's Multi-Modal Intelligence Fusion Agent**.
+    "video": """You are **SpandaOS's Multi-Modal Intelligence Fusion Agent**.
 
 RAW MULTIMODAL DATA (WHISPER AUDIO + QWEN VISUAL + OCR):
 {raw_content}
@@ -74,7 +77,7 @@ INSTRUCTIONS:
 
 OUTPUT: The definitive, enriched, and structured version of the document.""",
 
-    "audio": """You are **UltimaRAG's Senior Audio Intelligence Analyst**.
+    "audio": """You are **SpandaOS's Senior Audio Intelligence Analyst**.
 
 RAW TRANSCRIPTION INSIGHTS:
 {raw_content}

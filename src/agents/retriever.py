@@ -1,5 +1,8 @@
-# UltimaRAG — Multi-Agent RAG System
-# Copyright (C) 2026 Pankaj Varma
+# SpandaOS — The Living Pulse of Agentic Intelligence
+# A self-pulsing intelligence that lives at the core of the system — perpetually vibrating, continuously learning from every interaction, self-correcting its own errors, and driving all reasoning from a single living center — not because it was told to, but because that is its fundamental nature.
+# Copyright (C) 2026 Pankaj Umesh Varma
+# Contact: 9372123700
+# Email: pv43770@gmail.com
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
@@ -20,18 +23,18 @@ import json
 from datetime import datetime
 
 from ..core.utils import logger, Timer
-from ..core.database import UltimaRAGDatabase
+from ..core.database import SpandaOSDatabase
 from ..data.embedder import DeterministicEmbedder, get_embedder
 
 class RetrieverAgent:
     """
-    SOTA Retriever Agent for UltimaRAG.
+    SOTA Retriever Agent for SpandaOS.
     Utilizes LanceDB for project-aware, vector-native retrieval.
     """
     
     def __init__(
         self,
-        db: UltimaRAGDatabase,
+        db: SpandaOSDatabase,
         embedder: Optional[DeterministicEmbedder] = None
     ):
         from ..core.config import RerankerConfig
@@ -48,7 +51,7 @@ class RetrieverAgent:
             logger.error(f"Failed to initialize reranker {RerankerConfig.MODEL_NAME}: {e}")
             self.reranker = None
             
-        logger.info(f"RetrieverAgent (UltimaRAG Edition) initialized | Reranker: {RerankerConfig.MODEL_NAME}")
+        logger.info(f"RetrieverAgent (SpandaOS Edition) initialized | Reranker: {RerankerConfig.MODEL_NAME}")
     
     async def retrieve(
         self,
@@ -69,7 +72,7 @@ class RetrieverAgent:
         # SOTA: Respect .env-driven global chunk limit if not overridden
         top_k = top_k or Config.retrieval.FINAL_TOP_K
 
-        with Timer("UltimaRAG Retrieval + Rerank"):
+        with Timer("SpandaOS Retrieval + Rerank"):
             # 1. Generate Query Embedding
             query_vector = self.embedder.encode(query).tolist()
             

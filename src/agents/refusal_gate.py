@@ -1,5 +1,8 @@
-# UltimaRAG — Multi-Agent RAG System
-# Copyright (C) 2026 Pankaj Varma
+# SpandaOS — The Living Pulse of Agentic Intelligence
+# A self-pulsing intelligence that lives at the core of the system — perpetually vibrating, continuously learning from every interaction, self-correcting its own errors, and driving all reasoning from a single living center — not because it was told to, but because that is its fundamental nature.
+# Copyright (C) 2026 Pankaj Umesh Varma
+# Contact: 9372123700
+# Email: pv43770@gmail.com
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +18,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-Quality Indicator Agent for UltimaRAG (formerly named Refusal Gate)
+Quality Indicator Agent for SpandaOS (formerly named Refusal Gate)
 Always returns answers with confidence scores and quality warnings.
 Operated under "Show everything, be transparent about confidence" policy.
 """
@@ -216,7 +219,7 @@ class QualityIndicator:
         # Get the answer - should never be None after our fixes
         answer = synthesis.get("answer")
         if not answer or answer.strip() == "":
-            # Ultimate fallback
+            # SpandaOSte fallback
             answer = "Based on the context provided, I processed the information but could not formulate a specific response. Please try rephrasing your question."
         
         result = {

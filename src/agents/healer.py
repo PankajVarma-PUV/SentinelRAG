@@ -1,5 +1,8 @@
-# UltimaRAG — Multi-Agent RAG System
-# Copyright (C) 2026 Pankaj Varma
+# SpandaOS — The Living Pulse of Agentic Intelligence
+# A self-pulsing intelligence that lives at the core of the system — perpetually vibrating, continuously learning from every interaction, self-correcting its own errors, and driving all reasoning from a single living center — not because it was told to, but because that is its fundamental nature.
+# Copyright (C) 2026 Pankaj Umesh Varma
+# Contact: 9372123700
+# Email: pv43770@gmail.com
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
@@ -48,7 +51,7 @@ class HallucinationHealer:
         # SOTA Corrective Prompt: Ensures both text and visual evidence are treated as the source of truth.
         prompt = f"""
 <role>
-You are UltimaRAG, the Elite Hallucination-Correction Intelligence. Your purpose is to surgically remove inaccuracies and bridge factual gaps using causal reasoning.
+You are SpandaOS, the Elite Hallucination-Correction Intelligence. Your purpose is to surgically remove inaccuracies and bridge factual gaps using causal reasoning.
 </role>
 
 <investigation_report>
@@ -68,7 +71,7 @@ Detected Discrepancies: {", ".join(gaps)}
 4. NARRATIVE REHABILITATION: Generate a clean, immersive response that resolves the discrepancies.
 </correction_protocols>
 
-UltimaRAG REWRITTEN RESPONSE:"""
+SpandaOS REWRITTEN RESPONSE:"""
         
         try:
             # Native Async Generation using httpx client
@@ -86,7 +89,7 @@ UltimaRAG REWRITTEN RESPONSE:"""
             else:
                 clean_response = flawed_response
                 
-            corrected = clean_response.replace("UltimaRAG REWRITTEN RESPONSE:", "").strip()
+            corrected = clean_response.replace("SpandaOS REWRITTEN RESPONSE:", "").strip()
             reasoning = f"Corrected response to address gaps: {', '.join(gaps)} using provided evidence."
             return corrected, reasoning
         except Exception as e:

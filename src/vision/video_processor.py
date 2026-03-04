@@ -1,5 +1,8 @@
-# UltimaRAG — Multi-Agent RAG System
-# Copyright (C) 2026 Pankaj Varma
+# SpandaOS — The Living Pulse of Agentic Intelligence
+# A self-pulsing intelligence that lives at the core of the system — perpetually vibrating, continuously learning from every interaction, self-correcting its own errors, and driving all reasoning from a single living center — not because it was told to, but because that is its fundamental nature.
+# Copyright (C) 2026 Pankaj Umesh Varma
+# Contact: 9372123700
+# Email: pv43770@gmail.com
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +18,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-Video Processor for UltimaRAG.
+Video Processor for SpandaOS.
 Orchestrates frame extraction, OCR, vision perception, audio transcription,
 and narrative enrichment for video content.
 
@@ -298,7 +301,7 @@ class VideoProcessor:
         Swap the model via narrative_agent.py — this method never needs changing.
         """
         return (
-            f"You are an expert multimodal video analyst for UltimaRAG Intelligence System.\n"
+            f"You are an expert multimodal video analyst for SpandaOS Intelligence System.\n"
             f"Below is a structured, time-aligned extraction from a video ({duration:.1f}s long).\n\n"
             f"Each time segment has three aligned streams:\n"
             f"  SPEECH    = spoken words transcribed from audio (Whisper)\n"
@@ -333,7 +336,7 @@ class VideoProcessor:
               {"content": "<enriched description>",     "sub_type": "video_visual"},
             ]
         """
-        logger.info(f"🚀 UltimaRAG Video Pipeline: {os.path.basename(file_path)}")
+        logger.info(f"🚀 SpandaOS Video Pipeline: {os.path.basename(file_path)}")
         scraped_items: List[Dict] = []
 
         try:
@@ -424,7 +427,7 @@ class VideoProcessor:
                 try:
                     pil_img = Image.fromarray(cv2.cvtColor(frame_resized, cv2.COLOR_BGR2RGB))
                     scene_prompt = (
-                        "You are **UltimaRAG's Intelligence Fusion Agent**.\n"
+                        "You are **SpandaOS's Intelligence Fusion Agent**.\n"
                         "Describe this specific video scene with absolute technical precision. "
                         "Extract all factual entities, actions, and temporal context.\n"
                         "Output ONLY the enriched intelligence segment for this timestamp."

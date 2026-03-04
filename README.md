@@ -1,14 +1,14 @@
-# 🛡️ UltimaRAG: SOTA Metacognitive RAG Pipeline
+# 🛡️ SpandaOS: SOTA Metacognitive RAG Pipeline
 
-UltimaRAG is an advanced, autonomous Retrieval-Augmented Generation (RAG) system built with a **Metacognitive Brain** architecture. It leverages multi-agent orchestration, state-of-the-art vector storage, and a cinematic streaming UI to deliver high-precision, grounded, and multimodal AI responses.
+SpandaOS is an advanced, autonomous Retrieval-Augmented Generation (RAG) system built with a **Metacognitive Brain** architecture. It leverages multi-agent orchestration, state-of-the-art vector storage, and a cinematic streaming UI to deliver high-precision, grounded, and multimodal AI responses.
 
-![UltimaRAG Banner](https://img.shields.io/badge/Status-SOTA-blueviolet?style=for-the-badge)
+![SpandaOS Banner](https://img.shields.io/badge/Status-SOTA-blueviolet?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-green?style=for-the-badge)
 ![Tech](https://img.shields.io/badge/Framework-LangGraph%20%7C%20FastAPI-blue?style=for-the-badge)
 
 ## 🧠 The Metacognitive Architecture
 
-UltimaRAG doesn't just "retrieve and generate." It **reasons** through its own process using a LangGraph-powered graph:
+SpandaOS doesn't just "retrieve and generate." It **reasons** through its own process using a LangGraph-powered graph:
 
 1.  **Intent Classification**: Dynamically identifies the nature of the query (e.g., Multi-task, Summarization, Retrieval).
 2.  **Streaming Thought-UI**: Surfaces the internal "inner monologue" of the agents to the user in real-time (o1-style).
@@ -32,7 +32,7 @@ UltimaRAG doesn't just "retrieve and generate." It **reasons** through its own p
 
 ## 🚀 Getting Started (Local Execution)
 
-UltimaRAG is designed to be run **locally** to ensure complete data privacy and control.
+SpandaOS is designed to be run **locally** to ensure complete data privacy and control.
 
 ### Prerequisites
 - Python 3.10+
@@ -40,22 +40,22 @@ UltimaRAG is designed to be run **locally** to ensure complete data privacy and 
 
 ### Installation & Setup
 
-UltimaRAG features a **Smart setup script** that automatically detects your hardware (NVIDIA GPU vs CPU) and installs the correct ML stack for you.
+SpandaOS features a **Smart setup script** that automatically detects your hardware (NVIDIA GPU vs CPU) and installs the correct ML stack for you.
 
 #### Method 1: Streamlined Setup (Recommended)
-1. Download and run the **`clone_UltimaRAG.bat`** file. This script will automatically clone the repository for you.
-2. Enter the new `UltimaRAG` folder and run **`Run_UltimaRAG.bat`** to set up the environment and launch the application.
+1. Download and run the **`clone_SpandaOS.bat`** file. This script will automatically clone the repository for you.
+2. Enter the new `SpandaOS` folder and run **`Run_SpandaOS.bat`** to set up the environment and launch the application.
 
 #### Method 2: Manual Installation
 1.  **Clone the repository**:
     ```bash
-    git clone https://github.com/PankajVarma-PUV/UltimaRAG.git
-    cd UltimaRAG
+    git clone https://github.com/PankajVarma-PUV/SpandaOS.git
+    cd SpandaOS
     ```
 2.  **Start the Application**:
     Simply run the automated startup script. It will create a virtual environment, install the correct version of Torch for your hardware, and launch the server:
     ```bash
-    Run_UltimaRAG.bat
+    Run_SpandaOS.bat
     ```
 
 The API server will start at `http://localhost:8000`, and the UI will be accessible in your web browser.
@@ -73,8 +73,8 @@ Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for gui
 
 ## 📄 License
 
-UltimaRAG is licensed under the **GNU Affero General Public License v3.0**. See [LICENSE](LICENSE) for more information.
+SpandaOS is licensed under the **GNU Affero General Public License v3.0**. See [LICENSE](LICENSE) for more information.
 
 ---
-*Built with ❤️ by the UltimaRAG Team*
+*Built with ❤️ by the SpandaOS Team*
 

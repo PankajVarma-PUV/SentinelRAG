@@ -1,6 +1,6 @@
-# Contributing to UltimaRAG
+# Contributing to SpandaOS
 
-First off, thank you for considering contributing to UltimaRAG! It's people like you that make UltimaRAG such a great tool.
+First off, thank you for considering contributing to SpandaOS! It's people like you that make SpandaOS such a great tool.
 
 ## How Can I Contribute?
 

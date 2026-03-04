@@ -1,5 +1,8 @@
-# UltimaRAG — Multi-Agent RAG System
-# Copyright (C) 2026 Pankaj Varma
+# SpandaOS — The Living Pulse of Agentic Intelligence
+# A self-pulsing intelligence that lives at the core of the system — perpetually vibrating, continuously learning from every interaction, self-correcting its own errors, and driving all reasoning from a single living center — not because it was told to, but because that is its fundamental nature.
+# Copyright (C) 2026 Pankaj Umesh Varma
+# Contact: 9372123700
+# Email: pv43770@gmail.com
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
@@ -16,7 +19,7 @@
 
 from typing import List, Dict, Optional
 from datetime import datetime
-from .database import UltimaRAGDatabase
+from .database import SpandaOSDatabase
 from .config import Config
 from .utils import logger
 
@@ -30,12 +33,12 @@ from .utils import logger
 
 class MemoryManager:
     """
-    UltimaRAG Memory Manager (MemGPT implementation).
+    SpandaOS Memory Manager (MemGPT implementation).
     Controls the 'Virtual Context' by paging messages in and out of the LLM window.
     Tuned for Gemma3:4b with a 2048-token total context window.
     """
 
-    def __init__(self, db: UltimaRAGDatabase):
+    def __init__(self, db: SpandaOSDatabase):
         self.db = db
         # MemGPT Overflow Threshold — derived from Config.memgpt so it auto-scales
         # with MAX_INPUT_TOKENS when you upgrade hardware via .env

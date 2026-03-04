@@ -1,5 +1,8 @@
-# UltimaRAG — Multi-Agent RAG System
-# Copyright (C) 2026 Pankaj Varma
+# SpandaOS — The Living Pulse of Agentic Intelligence
+# A self-pulsing intelligence that lives at the core of the system — perpetually vibrating, continuously learning from every interaction, self-correcting its own errors, and driving all reasoning from a single living center — not because it was told to, but because that is its fundamental nature.
+# Copyright (C) 2026 Pankaj Umesh Varma
+# Contact: 9372123700
+# Email: pv43770@gmail.com
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +18,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-Vision Perception Agent for UltimaRAG.
+Vision Perception Agent for SpandaOS.
 Handles Qwen2-VL-2B inference via HuggingFace Transformers.
 Optimized for 6GB VRAM using 4-bit quantization and CPU offloading.
 """
@@ -36,7 +39,7 @@ class QwenVisionAgent:
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
     def _check_gpu_health(self):
-        """Forensic GPU diagnostic for UltimaRAG Elite."""
+        """Forensic GPU diagnostic for SpandaOS Elite."""
         logger.info("🕵️ GPU Diagnostic: Running health check...")
         try:
             torch_ver = torch.__version__
@@ -85,7 +88,7 @@ class QwenVisionAgent:
             }
 
             # Check if user wants to force GPU (can be useful if basic check fails but path exists)
-            force_gpu = os.getenv("Ultima_FORCE_GPU", "false").lower() == "true"
+            force_gpu = os.getenv("SpandaOS_FORCE_GPU", "false").lower() == "true"
             use_cuda = torch.cuda.is_available() or force_gpu
 
             if use_cuda:

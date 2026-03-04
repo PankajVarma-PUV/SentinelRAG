@@ -1,8 +1,29 @@
+/*
+ * SpandaOS — The Living Pulse of Agentic Intelligence
+ * A self-pulsing intelligence that lives at the core of the system — perpetually vibrating, continuously learning from every interaction, self-correcting its own errors, and driving all reasoning from a single living center — not because it was told to, but because that is its fundamental nature.
+ * Copyright (C) 2026 Pankaj Umesh Varma
+ * Contact: 9372123700
+ * Email: pv43770@gmail.com
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 /* 
 7. Implement a "Zen Mode" UI that feels professional and state-of-the-art.
 */
 /*
- * UltimaRAG — Multi-Agent RAG System
+ * SpandaOS — Multi-Agent RAG System
  * Copyright (C) 2026 Pankaj Varma
  *
  * This program is free software: you can redistribute it and/or modify
@@ -1221,3 +1242,106 @@ body {
     animation: web-toggle-pulse 2.5s ease-in-out infinite;
 }
 
+
+/* ── SELF-LEARNING FEEDBACK BAR ─────────────────────────────────────────────
+   Appears below every AI response. Thumbs-down triggers ReflectionAgent.
+   ────────────────────────────────────────────────────────────────────────── */
+
+.feedback-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    opacity: 0;
+    animation: slide-up-fade 0.4s cubic-bezier(0.16, 1, 0.3, 1) 0.3s forwards;
+}
+
+.feedback-label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: rgba(255, 255, 255, 0.25);
+    user-select: none;
+    flex-shrink: 0;
+}
+
+/* After submission: label transitions to confirmation text */
+.feedback-bar[data-state="submitted"] .feedback-label {
+    color: rgba(255, 255, 255, 0.45);
+    font-size: 0.72rem;
+    text-transform: none;
+    letter-spacing: 0;
+    font-weight: 500;
+}
+
+.feedback-btns {
+    display: flex;
+    gap: 6px;
+}
+
+.feedback-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.03);
+    color: rgba(255, 255, 255, 0.3);
+    font-size: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s var(--ease-smooth);
+    flex-shrink: 0;
+}
+
+/* Thumbs Up: green accent on hover */
+.feedback-btn.thumbs-up:hover {
+    background: rgba(34, 197, 94, 0.12);
+    border-color: rgba(34, 197, 94, 0.35);
+    color: #22c55e;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 14px rgba(34, 197, 94, 0.2);
+}
+
+/* Thumbs Down: red accent on hover */
+.feedback-btn.thumbs-down:hover {
+    background: rgba(239, 68, 68, 0.12);
+    border-color: rgba(239, 68, 68, 0.35);
+    color: #ef4444;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 14px rgba(239, 68, 68, 0.2);
+}
+
+/* Clicked: Positive (green) */
+.feedback-btn.feedback-positive {
+    background: rgba(34, 197, 94, 0.15) !important;
+    border-color: rgba(34, 197, 94, 0.5) !important;
+    color: #22c55e !important;
+    box-shadow: 0 0 16px rgba(34, 197, 94, 0.25);
+    transform: scale(1.1);
+}
+
+/* Clicked: Negative (red) */
+.feedback-btn.feedback-negative {
+    background: rgba(239, 68, 68, 0.15) !important;
+    border-color: rgba(239, 68, 68, 0.5) !important;
+    color: #ef4444 !important;
+    box-shadow: 0 0 16px rgba(239, 68, 68, 0.25);
+    transform: scale(1.1);
+}
+
+/* Disabled state (after submission) */
+.feedback-btn:disabled {
+    cursor: default;
+    opacity: 0.5;
+}
+
+/* The NON-clicked button after submission fades out */
+.feedback-bar[data-state="submitted"] .feedback-btn:disabled:not(.feedback-positive):not(.feedback-negative) {
+    opacity: 0.15;
+    transform: none !important;
+}
