@@ -482,11 +482,10 @@ class MetacognitiveBrain:
                 logger.info("Brain: RAG intent but only visual found. Routing to Perception.")
                 return "perception"
                 
-        # SOTA Phase 4: Web Search Intent triggers RAG path to fetch external evidence
-        if "web" in intent_val:
-            logger.info("Brain: WEB_SEARCH intent detected. Routing to RAG to fetch external data.")
-            return "rag"
-            
+        # NOTE: WEB_SEARCH intent is no longer emitted by the classifier.
+        # Web search is controlled ONLY by the user toggle (use_web_search flag).
+        # There is intentionally no routing based on web intent here.
+
         # Fallback: If we HAVE evidence but intent is "general", we should still lean towards RAG 
         # to ensure the user gets grounded information if they uploaded something.
         if has_any_evidence:
@@ -495,236 +494,329 @@ class MetacognitiveBrain:
 
         return "direct"
 
+    async def _run_web_breakout(self, state: SpandaOSState, query: str) -> Optional[List[Dict]]:
+        """
+        Web Breakout Agent (v3 — Snippet-First) — ONLY called when use_web_search is explicitly True.
+
+        Uses the layered web_search v3 architecture:
+          Layer 1: ddgs.news() for news/geopolitical queries (dated English articles, no scraping)
+          Layer 2: ddgs.text() with snippet-as-primary-content (always works, no scraping dependency)
+          Layer 3: Selective scraping for trusted open domains (Wikipedia, Reuters, BBC, etc.)
+
+        Steps:
+          1. Optimize the query into a precise English search phrase.
+          2. Auto-detect news/geo intent and set result breadth accordingly.
+          3. Run the layered search in a thread executor (blocking I/O safety).
+          4. Return structured results: [{'title', 'url', 'date', 'text'}, ...] or None on failure.
+        """
+        import asyncio
+        from ..tools.web_search import fallback_web_search, is_news_query
+
+        # Step 1: Optimize the query for search engine precision
+        # NOTE: Explicitly request English to prevent DuckDuckGo returning Chinese results
+        # for geopolitical/news queries (root cause of the v2 scraping failure).
+        search_query = query
+        if len(query.split()) > 8 or "?" in query:
+            opt_prompt = (
+                f"Convert this conversational query into a concise, precise English search engine query. "
+                f"The query MUST be in English only. "
+                f"Output ONLY the search query, nothing else: '{query}'"
+            )
+            try:
+                optimized = await self.llm_light.ainvoke(opt_prompt)
+                optimized = optimized.strip().strip('"').strip("'")
+                # Guard against LLM returning a non-query paragraph
+                if optimized and len(optimized.split()) <= 15:
+                    search_query = optimized
+                    logger.info(f"[WebBreakout] Optimized search query: '{search_query}'")
+            except Exception as opt_err:
+                logger.warning(f"[WebBreakout] Query optimization failed, using original: {opt_err}")
+
+        # Step 2: Dynamic result count — more for news/geopolitical queries
+        max_results = 10 if is_news_query(query) else 7
+        logger.info(f"[WebBreakout] Fetching up to {max_results} sources (v3 snippet-first) for: '{search_query}'")
+
+        # Step 3: Run layered web search in a thread executor (blocking I/O)
+        try:
+            results = await asyncio.get_event_loop().run_in_executor(
+                None, fallback_web_search, search_query, max_results
+            )
+        except Exception as scrape_err:
+            logger.error(f"[WebBreakout] Web search executor failed: {scrape_err}")
+            return None
+
+        if not results:
+            logger.warning("[WebBreakout] All search layers returned no usable results.")
+            return None
+
+        logger.info(f"[WebBreakout] Retrieved {len(results)} source(s) from live web (snippet-first v3).")
+        return results
+
+    def _format_web_evidence(self, web_results: List[Dict]) -> str:
+        """
+        Format a list of web results into a rich, numbered, citation-ready context string.
+        The synthesizer LLM uses this to produce URL-attributed answers.
+        """
+        blocks = []
+        for i, res in enumerate(web_results, start=1):
+            title = res.get("title", "Untitled")
+            url   = res.get("url", "")
+            date  = res.get("date", "")
+            text  = res.get("text", "")
+
+            header = f"[Source {i}] {title}"
+            if date:
+                header += f" ({date})"
+            block_lines = [header, f"URL: {url}", "", text]
+            blocks.append("\n".join(block_lines))
+        return "\n\n---\n\n".join(blocks)
+
+    def _build_web_retrieved_fragments(self, web_results: List[Dict]):
+        """
+        Convert raw web results into retrieved_fragments + source_map for the Source Explorer.
+
+        Each web source gets TWO keys in retrieved_fragments:
+          1. "WEB::<url>::<display_title>"  — canonical key, parsed by frontend for URL/icon
+          2. "Source N"                     — alias key matching the [[Source N]] LLM citations
+
+        Both keys point to the SAME chunk list (with url in every chunk), so regardless
+        of how the LLM cites (by number or by filename), openArtifact() always finds the
+        right fragments.
+
+        Text is split into ≤800-char overlapping chunks so each fragment is
+        readable in the Source Explorer sidebar.
+
+        Returns:
+            (retrieved_fragments: Dict[str, list], source_map: Dict[str, int])
+        """
+        retrieved_fragments: Dict[str, list] = {}
+        CHUNK_SIZE = 800
+        CHUNK_OVERLAP = 80
+
+        for source_num, res in enumerate(web_results, start=1):
+            url   = res.get("url", "").strip()
+            title = res.get("title", "Web Source").strip()[:80]  # cap length
+            date  = res.get("date", "").strip()
+            text  = res.get("text", "").strip()
+
+            if not url or not text:
+                continue
+
+            # Build canonical compound key that the frontend parses for URL/title/icon
+            display_label = f"{title} ({date})" if date else title
+            canonical_key = f"WEB::{url}::{display_label}"
+
+            # Also the short alias key matching [[Source N]] LLM citations
+            alias_key = f"Source {source_num}"
+
+            # Split text into overlapping chunks
+            chunks = []
+            start = 0
+            while start < len(text):
+                end = min(start + CHUNK_SIZE, len(text))
+                chunk_text = text[start:end].strip()
+                if chunk_text:
+                    chunks.append({
+                        "text": chunk_text,
+                        "score": None,   # Web results have no vector similarity score
+                        "url": url,
+                        "title": display_label,
+                    })
+                if end >= len(text):
+                    break
+                start = end - CHUNK_OVERLAP
+
+            if chunks:
+                # Register under BOTH keys — openArtifact() may receive either
+                retrieved_fragments[canonical_key] = chunks
+                retrieved_fragments[alias_key]     = chunks
+
+        # source_map only uses canonical keys for numbered display
+        canonical_keys = [k for k in retrieved_fragments if k.startswith("WEB::")]
+        source_map = {key: i + 1 for i, key in enumerate(canonical_keys)}
+        # Also add alias → same number
+        for key in list(retrieved_fragments):
+            if not key.startswith("WEB::"):
+                # alias key like "Source N" — find its number from alias_key suffix
+                try:
+                    n = int(key.split()[-1])
+                    source_map[key] = n
+                except (ValueError, IndexError):
+                    pass
+        return retrieved_fragments, source_map
+
     async def evaluate_knowledge(self, state: SpandaOSState) -> Dict:
         """
         Elite Knowledge Evaluator.
         Requirement 2: Determine if answer should come from context or LLM memory.
         Requirement 3: Strict enforcement for @mentions.
+
+        WEB SEARCH POLICY (non-negotiable):
+          Web search is ONLY invoked when state["use_web_search"] is True.
+          Intent classification NEVER triggers web search.
         """
         tid = telemetry.start_activity("Evaluator", "Assessing knowledge grounding")
-        
-        query = state["query"]
+
+        query         = state["query"]
         mentioned_files = state.get("mentioned_files", [])
-        evidence = state.get("evidence", [])
-        perceived = state.get("perceived_media", [])
-        
+        evidence      = state.get("evidence", [])
+        perceived     = state.get("perceived_media", [])
+        web_enabled   = state.get("use_web_search", False)  # ← Single source of truth
+
         has_evidence = len(evidence) > 0 or len(perceived) > 0
-        
-        # Case 1: @mentions -> Strict Grounded
+
+        # ── Case 1: @mentions → Strict Grounded ─────────────────────────────────
         if mentioned_files:
-            logger.info(f"Evaluator: @mentions detected, setting response_mode to 'strict_grounded'")
-            telemetry.end_activity(tid, {"mode": "strict_grounded", "has_evidence": has_evidence})
+            logger.info("Evaluator: @mentions detected → response_mode = strict_grounded")
+            telemetry.end_activity(tid, {"mode": "strict_grounded"})
             return {"response_mode": "strict_grounded"}
 
-        # Case 2: No evidence -> Internal Knowledge (or Web Breakout if toggle is ON)
+        # ── Case 2: No local evidence ────────────────────────────────────────────
         if not has_evidence:
-            intent_val = state.get("intent", "general_intelligence")
-            is_web_intent = "web" in (intent_val.value if hasattr(intent_val, "value") else str(intent_val)).lower()
-            
-            # BUG FIX: Check web flag HERE before falling back to internal weights.
-            # Previously this early-return fired before the Case 3 web breakout code.
-            if state.get("use_web_search", False) or is_web_intent:
-                logger.info("[WebBreakout] No local evidence. Web Toggle is ON or Intent is WEB — invoking Web Agent.")
-                try:
-                    import asyncio
-                    from ..tools.web_search import fallback_web_search
-                    
-                    # SOTA: Query Optimization for Web Search
-                    # If the query is conversational, try to extract a better search string
-                    search_query = query
-                    if "?" in query or len(query.split()) > 10:
-                        opt_prompt = f"Convert this conversational query into a short, effective search engine query: '{query}'. Output ONLY the search query."
-                        try:
-                            search_query = await self.llm_light.ainvoke(opt_prompt)
-                            search_query = search_query.strip().strip('"').strip("'")
-                            logger.info(f"[WebBreakout] Optimized query for web: '{search_query}'")
-                        except Exception as opt_err:
-                            logger.warn(f"[WebBreakout] Query optimization failed: {opt_err}")
-
-                    # SOTA: Dynamic Result Count (Use more for broad inquiries)
-                    max_results = 5
-                    if any(word in query.lower() for word in ["news", "latest", "trending", "current", "happen"]):
-                        max_results = 8
-                        logger.info(f"[WebBreakout] Detected broad inquiry, increasing result breadth to {max_results}")
-
-                    # Run blocking I/O in a thread executor to avoid blocking the event loop
-                    web_context_results = await asyncio.get_event_loop().run_in_executor(
-                        None, fallback_web_search, search_query, max_results
+            if web_enabled:
+                logger.info("[WebBreakout] No local evidence. Web Toggle is explicitly ON — invoking Web Agent.")
+                web_results = await self._run_web_breakout(state, query)
+                if web_results:
+                    web_context_str = self._format_web_evidence(web_results)
+                    web_rf, web_sm = self._build_web_retrieved_fragments(web_results)
+                    total_web_chunks = sum(len(v) for v in web_rf.values())
+                    logger.info(
+                        f"[WebBreakout] {len(web_results)} source(s) → "
+                        f"{total_web_chunks} browsable chunk(s) injected into Source Explorer."
                     )
-                    
-                    # SOTA: web_context_results is a list of dicts: [{'title': str, 'url': str, 'text': str}, ...]
-                    # Check for failure markers in the results
-                    failed = False
-                    if not web_context_results:
-                        failed = True
-                    else:
-                        # If the list contains an error message or indicator
-                        failed_markers = ["web search failed", "no real-time web results", "sites may have blocked"]
-                        # Check first result's text if it exists
-                        first_text = web_context_results[0].get('text', '').lower() if web_context_results else ""
-                        if any(m in first_text for m in failed_markers):
-                            failed = True
+                    telemetry.end_activity(tid, {
+                        "mode": "grounded_in_docs",
+                        "source": "web_no_local_evidence",
+                        "web_sources": len(web_results),
+                        "web_chunks": total_web_chunks,
+                    })
+                    return {
+                        "response_mode": "grounded_in_docs",
+                        "evidence": [{
+                            "file_name": "Live Web Search",
+                            "text": web_context_str,
+                            "sub_type": "text",
+                            "source": "WebBreakoutAgent",
+                            "score": 0.90
+                        }],
+                        "retrieved_fragments": web_rf,
+                        "source_map": web_sm,
+                    }
+                logger.info("[WebBreakout] Web search returned no results — falling back to internal knowledge.")
 
-                    if not failed:
-                        logger.info("[WebBreakout] Web search succeeded — injecting as grounded evidence.")
-                        
-                        # Format list into a single context string for evaluation if needed
-                        # though Case-1 logic usually handles this.
-                        combined_text = "\n\n".join([f"{r.get('title')}: {r.get('text')}" for r in web_context_results])
-                        
-                        telemetry.end_activity(tid, {"mode": "grounded_in_docs", "confidence": "web_no_local_evidence"})
-                        return {
-                            "response_mode": "grounded_in_docs",
-                            "evidence": [{
-                                "file_name": "Live Web Search",
-                                "text": combined_text,
-                                "sub_type": "text",
-                                "source": "WebBreakoutAgent",
-                                "score": 0.85
-                            }]
-                        }
-                    else:
-                        logger.info("[WebBreakout] Web search yielded no usable results — falling back to internal knowledge.")
-                except Exception as web_err:
-                    logger.error(f"[WebBreakout] Exception during Case-2 web search: {web_err}")
-            logger.info("Evaluator: No evidence found, setting response_mode to 'internal_llm_weights'")
+            # Web is OFF or web returned nothing → internal LLM weights
+            logger.info("Evaluator: No evidence found → response_mode = internal_llm_weights")
             telemetry.end_activity(tid, {"mode": "internal_llm_weights", "has_evidence": False})
             return {
                 "response_mode": "internal_llm_weights",
-                "retrieved_fragments": {}, # LOCK 1: Explicitly clear on rejection
+                "retrieved_fragments": {},
                 "source_map": {}
             }
 
-
-        # Case 3: Hybrid/Grounded Confidence Check
-        # Requirement 2: Classify whether answer is in context with high confidence
-        
-        # SOTA FIX: If intent is PERCEPTION or RAG, and we have evidence, 
-        # we should be EXTREMELY hesitant to switch to internal knowledge.
+        # ── Case 3: Evidence exists — Confidence check ───────────────────────────
+        # SOTA FIX: If intent is PERCEPTION or RAG and we have evidence,
+        # be EXTREMELY hesitant to switch to internal knowledge.
         intent = state.get("intent", "general_intelligence")
         is_perceptual = intent in ["multimodal_analysis", "document_search"]
-        
+
         context_summary = ""
         if evidence:
-            # SOTA Fix: Increase breadth (3 -> 12) to ensure multiple files are represented
             context_summary += "\n".join([f"- {e.get('text', '')[:300]}" for e in evidence[:12]])
         if perceived:
-            # SOTA Fix: Increase breadth (3 -> 12) to ensure multiple visual assets are represented
             context_summary += "\n".join([f"- Visual: {p.get('content', '')[:300]}" for p in perceived[:12]])
 
-        eval_prompt = f"""
-        <role>
-        You are the SpandaOS Grounding Auditor. Your mission is to verify if a user's inquiry can be answered with 100% fidelity using the provided context.
-        </role>
+        eval_prompt = f"""<role>
+You are the SpandaOS Grounding Auditor. Your mission is to verify if a user's inquiry can be answered with 100% fidelity using the provided context.
+</role>
 
-        <inquiry>
-        {query}
-        </inquiry>
+<inquiry>
+{query}
+</inquiry>
 
-        <source_context>
-        {context_summary}
-        </source_context>
+<source_context>
+{context_summary}
+</source_context>
 
-        <audit_task>
-        Analyze the context. Does it contain the essential facts to answer the inquiry?
-        Respond with EXACTLY 'YES' if sufficient, or 'NO' if insufficient.
-        </audit_task>
+<audit_task>
+Analyze the context. Does it contain the essential facts to answer the inquiry?
+Respond with EXACTLY 'YES' if sufficient, or 'NO' if insufficient.
+</audit_task>
 
-        AUDIT RESULT:"""
-        
+AUDIT RESULT:"""
+
         try:
             eval_res = await self.llm_light.ainvoke(eval_prompt)
             confidence_yes = "YES" in eval_res.upper()
-            
-            # If intent is perceptual, but LLM says NO, we check if it's just a general description request
-            # Requests like "tell me about this" often fail a strict YES/NO grounding check
+
+            # Perceptual override: don't abandon evidence for visual/audio queries
             if is_perceptual and not confidence_yes and has_evidence:
-                logger.info(f"Evaluator: Intent is {intent}, overriding LLM 'NO' to preserve grounding.")
+                logger.info(f"Evaluator: Intent is {intent} — overriding LLM 'NO' to preserve grounding.")
                 confidence_yes = True
 
             mode = "grounded_in_docs" if confidence_yes else "internal_llm_weights"
-            logger.info(f"Evaluator: Query confidence analysis: {eval_res.strip()} -> mode: {mode} (Intent: {intent})")
-            
-            # ── WEB BREAKOUT FORK ──────────────────────────────────────────────────
-            # If local evidence is insufficient BUT the user enabled the Web Toggle,
-            # fetch live web data and override to grounded mode.
-            if not confidence_yes and state.get("use_web_search", False):
-                logger.info("[WebBreakout] Local grounding insufficient. Web Toggle is ON — invoking Web Agent.")
-                try:
-                    import asyncio
-                    from ..tools.web_search import fallback_web_search
-                    # LATENCY FIX: Run blocking trafilatura I/O in a thread executor
-                    # to avoid freezing the asyncio event loop for 10-30 seconds.
-                    # SOTA: Query Optimization for Case 3
-                    search_query = query
-                    if "?" in query or len(query.split()) > 10:
-                        opt_prompt = f"Convert this conversational query into a short, effective search engine query: '{query}'. Output ONLY the search query."
-                        try:
-                            search_query = await self.llm_light.ainvoke(opt_prompt)
-                            search_query = search_query.strip().strip('"').strip("'")
-                        except: pass
+            logger.info(f"Evaluator: Confidence = {eval_res.strip()} → mode = {mode} (Intent: {intent})")
 
-                    max_results = 5
-                    if any(word in query.lower() for word in ["news", "latest", "trending", "current", "happen"]):
-                        max_results = 8
+            # ── WEB BREAKOUT FORK ────────────────────────────────────────────────
+            # Local evidence is insufficient AND user explicitly enabled web toggle.
+            # NOTE: This ONLY fires when web_enabled is True — no intent bypass.
+            if not confidence_yes and web_enabled:
+                logger.info("[WebBreakout] Local grounding insufficient. Web Toggle is explicitly ON — invoking Web Agent.")
+                web_results = await self._run_web_breakout(state, query)
+                if web_results:
+                    # Persist sources for follow-up RAG queries
+                    try:
+                        self.db.add_web_search_result(state["conversation_id"], query, web_results)
+                    except Exception as persist_err:
+                        logger.warning(f"[WebBreakout] Persistence failed (non-fatal): {persist_err}")
 
-                    web_results = await asyncio.get_event_loop().run_in_executor(
-                        None, fallback_web_search, search_query, max_results
+                    web_context_str = self._format_web_evidence(web_results)
+                    web_rf, web_sm = self._build_web_retrieved_fragments(web_results)
+                    total_web_chunks = sum(len(v) for v in web_rf.values())
+                    logger.info(
+                        f"[WebBreakout] {len(web_results)} source(s) → "
+                        f"{total_web_chunks} browsable chunk(s) injected into Source Explorer."
                     )
-                    
-                    if web_results:
-                        logger.info(f"[WebBreakout] Web search successful ({len(web_results)} results) — persisting and injecting as grounded evidence.")
-                        
-                        # SOTA: Check first result for common failure snippets if list isn't empty
-                        first_text = web_results[0].get('text', '').lower()
-                        failed_markers = ["web search failed", "no real-time web results", "sites may have blocked"]
-                        if any(m in first_text for m in failed_markers):
-                            logger.info("[WebBreakout] Web results contain failure markers. Falling back.")
-                        else:
-                            # 1. Persist all individual sources for context-aware follow-up RAG
-                            self.db.add_web_search_result(state["conversation_id"], query, web_results)
-                            
-                            # 2. Format a unified context string for the current LLM answer node
-                            formatted_context = []
-                            for res in web_results:
-                                formatted_context.append(f"Source: {res['title']}\nURL: {res['url']}\n\n{res['text']}...")
-                            
-                            web_context_str = "\n\n---\n\n".join(formatted_context)
-                            
-                            new_evidence = list(state.get("evidence", []))
-                            new_evidence.append({
-                                "file_name": "Live Web Search",
-                                "text": web_context_str,
-                                "sub_type": "text",
-                                "source": "WebBreakoutAgent",
-                                "score": 0.85
-                            })
-                            telemetry.end_activity(tid, {"mode": "grounded_in_docs", "confidence": "web_override"})
-                            return {"response_mode": "grounded_in_docs", "evidence": new_evidence}
-                    
-                    logger.info("[WebBreakout] Web search yielded no usable results or was blocked. Falling back to internal knowledge.")
-                except Exception as web_err:
-                    logger.error(f"[WebBreakout] Web search raised an exception: {web_err}")
-            # ── END WEB BREAKOUT FORK ────────────────────────────────────────────────
-            
-            # If switching to internal mode, we nullify the evidence for the synthesizer to prevent confusion
+
+                    new_evidence = list(state.get("evidence", []))
+                    new_evidence.append({
+                        "file_name": "Live Web Search",
+                        "text": web_context_str,
+                        "sub_type": "text",
+                        "source": "WebBreakoutAgent",
+                        "score": 0.90
+                    })
+                    telemetry.end_activity(tid, {
+                        "mode": "grounded_in_docs",
+                        "source": "web_override",
+                        "web_sources": len(web_results),
+                        "web_chunks": total_web_chunks,
+                    })
+                    return {
+                        "response_mode": "grounded_in_docs",
+                        "evidence": new_evidence,
+                        "retrieved_fragments": web_rf,
+                        "source_map": web_sm,
+                    }
+
+                logger.info("[WebBreakout] Web search returned nothing — falling back to internal knowledge.")
+            # ── END WEB BREAKOUT FORK ────────────────────────────────────────────
+
             updates = {"response_mode": mode}
-            
             action_msg = f"Audited query confidence: {eval_res.strip()}. Grounding mode: {mode}."
             updates["thought"] = action_msg
-            
+
             if mode == "internal_llm_weights":
                 updates.update({
                     "evidence": [],
                     "perceived_media": [],
                     "intent": "general_intelligence",
-                    "retrieved_fragments": {}, # LOCK 1: Hard clear during evaluation rejection
+                    "retrieved_fragments": {},
                     "source_map": {}
                 })
 
             telemetry.end_activity(tid, {"mode": mode, "confidence": eval_res.strip(), "action": action_msg})
             return updates
-            
+
         except Exception as e:
             logger.error(f"Knowledge Evaluation Error: {e}")
             telemetry.end_activity(tid, {"mode": "grounded_in_docs", "error": str(e)})
@@ -876,7 +968,41 @@ class MetacognitiveBrain:
 
         # Standard non-isolated vector search (Global knowledge base)
         # ONLY if no isolation_targets are set.
-        
+
+        # ── WEB SHORT-CIRCUIT: If evaluate_knowledge already populated web fragments,
+        # skip local vector search entirely. The multi-query would return 0 chunks anyway
+        # (web queries have no local embeddings) and would OVERWRITE the web-sourced
+        # retrieved_fragments with an empty map — breaking Source Explorer.
+        existing_rf = state.get("retrieved_fragments", {})
+        existing_web_keys = [k for k in existing_rf if k.startswith("WEB::") or (
+            # detect alias keys that were populated by _build_web_retrieved_fragments
+            k.startswith("Source ") and existing_rf.get(k) and
+            existing_rf[k] and existing_rf[k][0].get("url")
+        )]
+        if existing_web_keys:
+            web_source_count = len([k for k in existing_rf if k.startswith("WEB::")])
+            total_web_chunks = sum(
+                len(v) for k, v in existing_rf.items() if k.startswith("WEB::")
+            )
+            action_msg = (
+                f"Web Agent sourced {web_source_count} live article(s) → "
+                f"{total_web_chunks} knowledge chunk(s) ready for synthesis."
+            )
+            logger.info(f"[RAG] Web fragments already present — skipping local vector search. {action_msg}")
+            telemetry.end_activity(tid, {
+                "count": total_web_chunks,
+                "mode": "web_passthrough",
+                "action": action_msg,
+            })
+            # Return existing evidence + fragments intact — do NOT touch them
+            return {
+                "evidence": state.get("evidence", []),
+                "thought": action_msg,
+                "retrieved_fragments": existing_rf,
+                "source_map": state.get("source_map", {}),
+            }
+        # ── END WEB SHORT-CIRCUIT ─────────────────────────────────────────────────
+
         # SOTA Phase 4: Multi-Query Generation Sub-Agent
         # We spawn 3 variations of the question concurrently to blanket the vector space,
         # then deduplicate the chunks. This increases hit probability on obscure facts by 300%.

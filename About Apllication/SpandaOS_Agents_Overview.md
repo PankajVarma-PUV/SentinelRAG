@@ -170,8 +170,9 @@ graph TD
         Perception -->|Visual/Audio Assets| Evaluator
         
         %% Evaluator Logic
-        Evaluator -->|If context empty & Web ON| WebBreakout
+        Evaluator -->|If context empty/insufficient & Web ON| WebBreakout
         WebBreakout -.->|Injects Live Data| Evaluator
+        WebBreakout -.->|Persists Search Results| SQLiteDB
         Evaluator -->|Sufficient Context| Synthesis
         Evaluator -->|Insufficient Context| GenSynthesis
         DirectInit -->|Forces| GenSynthesis
@@ -263,7 +264,7 @@ The diagram highlights four primary pathways in the system:
 
 # Focused Sub-Diagrams
 
-To aid in explaining specific capabilities of the system, the master architecture is broken down below into 6 specialized, high-resolution views.
+To aid in explaining specific capabilities of the system, the master architecture is broken down below into 7 specialized, high-resolution views.
 
 ## 1. The Senses (Ingestion Pipeline)
 This view shows how background extraction workers scrape raw files into vector evidence. Note how the `MultimodalManager` acts as the traffic controller for all media types.
@@ -370,8 +371,9 @@ graph TD
     
     %% Knowledge Evaluation Bottleneck
     Evaluator["Knowledge Evaluator"]:::graphNode
-    Evaluator -->|Context Empty + Web ON| Web["Web Breakout Agent"]:::action
-    Web -.-> Evaluator
+    Evaluator -->|Context Empty/Insufficient + Web ON| Web["Web Breakout Agent"]:::action
+    Web -.->|Injects Live Data| Evaluator
+    Web -.->|Caches Results| SQLite
     
     Evaluator -->|Mode: grounded_in_docs| Synth[To Cognitive Synthesis]
     Evaluator -->|Mode: internal_llm_weights| GenSynth[To General Synthesis]
@@ -460,4 +462,59 @@ graph TD
     GuideMgr -.->|Reads raw file into cache| JSON
     GuideMgr -->|Filters & Scores by Intent| Scorer{Max 150 Tokens}
     Scorer -->|Injects top 5-7 rules| Brain[Metacognitive Brain]:::graphNode
+```
+
+## 7. Web Search Agent (Live Data Breakout)
+This view isolates the conditional flow of the `Web Breakout Agent`. It details how SpandaOS determines when to break out to the live web, the fallback mechanisms used, and how web results are persisted and synthesized.
+
+```mermaid
+graph TD
+    classDef graphNode fill:#0f172a,stroke:#334155,color:#38bdf8,stroke-width:1px;
+    classDef action fill:#9a3412,stroke:#c2410c,color:#fed7aa;
+    classDef manager fill:#86198f,stroke:#701a75,color:#fbcfe8;
+    classDef external fill:#7f1d1d,stroke:#991b1b,color:#fff;
+    classDef db fill:#3f3f46,stroke:#71717a,color:#e4e4e7,shape:cylinder;
+
+    %% Entry point is the Evaluator
+    Evaluator["Knowledge Evaluator"]:::graphNode
+    Toggle{"Web Toggle ON?"}
+    
+    %% Triggers
+    Evaluator -->|1. Local Context Empty| Toggle
+    Evaluator -->|2. Local Context Insufficient| Toggle
+    
+    Toggle -->|No| Fallback[Returns Internal LLM Weights / Fast-Fail]:::graphNode
+    Toggle -->|Yes| Opt["Query Optimizer (gemma3:4b)"]:::graphNode
+    
+    %% Query Optimization
+    Opt -->|Detects Intent / Shrinks Query| Web["Web Breakout Agent (v3)"]:::action
+    
+    %% Web Breakout Layers
+    subgraph Layered Web Search
+        direction TB
+        Web -->|Layer 1: News/Geo Intent| News[DuckDuckGo News API]:::external
+        Web -->|Layer 2: Standard Intent| Snippet[DuckDuckGo Text + Snippet Search]:::external
+    end
+    %% Trafilatura Scraping
+    News -->|Enriches Trusted Domains| Scrape[Trafilatura Extractor]:::action
+    Snippet -->|Enriches Trusted Domains| Scrape
+    
+    %% Results Compilation
+    News --> Formatter["Web Evidence Formatter"]:::manager
+    Snippet --> Formatter
+    Scrape --> Formatter
+    
+    %% Formatting Details
+    Formatter -->|Splits into ≤800-char semantic chunks| Chunker[Chunking Engine]:::graphNode
+    
+    %% Empty Fallback
+    Web -.->|All Layers Fail| Fallback
+    
+    %% Persistence & Mapping 
+    Chunker -->|1. Formats to Markdown String| Synthesis["Cognitive Synthesis"]:::graphNode
+    Chunker -->|2. Caches for source viewing| SQLite[(SQLite Relational DB)]:::db
+    Chunker -->|3. Maps Chunks to UI| Maps["retrieved_fragments & source_map"]:::manager
+    
+    %% Final Integration
+    Maps --> SourceApp[Source Explorer App UI]
 ```

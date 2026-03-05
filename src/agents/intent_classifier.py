@@ -96,18 +96,21 @@ class IntentClassifier:
             return Intent.RAG, target_language
 
 
+        # NOTE: WEB_SEARCH is intentionally NOT in the taxonomy.
+        # Web access is controlled exclusively by the user's Web toggle button.
+        # Putting WEB_SEARCH in the LLM taxonomy caused the classifier to auto-produce
+        # it for geopolitical/news queries, which bypassed the toggle — this is the bug fix.
         prompt = f"""
 <role>
 You are the SpandaOS Wise Intent Router. Classify inquiries into the most efficient processing pipeline with high-fidelity calibration.
 </role>
 
 <taxonomy>
-- GENERAL: Greetings, general conversation, or non-grounded knowledge.
-- RAG: Questions requiring precision document retrieval and facts.
+- GENERAL: Greetings, general conversation, questions about current events, news, or non-grounded knowledge (default for queries that don't belong to other categories).
+- RAG: Questions explicitly requiring precision document retrieval and facts from uploaded files.
 - PERCEPTION: Inquiries about visual/audio assets (images, videos).
 - MULTI_TASK: Complex requests involving multiple distinct actions (e.g., "Summarize this PDF and translate the first page").
 - HISTORY: Requests for conversational recall or timeline summaries.
-- WEB_SEARCH: Queries asking for current events, news, or things unlikely to be in internal documents.
 </taxonomy>
 
 <user_input>
@@ -148,7 +151,7 @@ INTENT JSON:"""
             elif "RAG" in intent_str: intent = Intent.RAG
             elif "MULTI" in intent_str: intent = Intent.MULTI_TASK
             elif "HISTORY" in intent_str: intent = Intent.HISTORY
-            elif "WEB" in intent_str: intent = Intent.WEB_SEARCH
+            # WEB_SEARCH is no longer emitted by the classifier — it is a UI toggle only.
             
             logger.info(f"Wise Intent Routing: {intent} (Confidence: {confidence:.2f})")
             return intent, target_language

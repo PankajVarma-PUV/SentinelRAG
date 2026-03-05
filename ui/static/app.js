@@ -735,18 +735,48 @@ class SpandaOSApp {
             // SOTA: Cleanse sources for display (unique base names)
             const uniqueSources = new Map();
             Array.from(usedSources).forEach(s => {
-                const base = s.includes('.') ? s.split('.').slice(0, -1).join('.') : s;
+                // Skip pure alias keys like "Source N" — they'll show up via their WEB:: canonical key
+                // (alias keys are duplicates used only for fragment lookup, not display)
+                const isAlias = /^Source\s+\d+$/.test(s);
+                if (isAlias) return;
+                const base = s.startsWith('WEB::') ? s : (s.includes('.') ? s.split('.').slice(0, -1).join('.') : s);
                 if (!uniqueSources.has(base.toLowerCase())) {
                     uniqueSources.set(base.toLowerCase(), s);
                 }
             });
+            // Also add bare Source N entries if no WEB:: key was found (fallback for incomplete citation)
+            Array.from(usedSources).forEach(s => {
+                if (/^Source\s+\d+$/.test(s) && !Array.from(uniqueSources.values()).some(v => v.startsWith('WEB::'))) {
+                    if (!uniqueSources.has(s.toLowerCase())) uniqueSources.set(s.toLowerCase(), s);
+                }
+            });
 
-            const footerItems = Array.from(uniqueSources.values()).map((s, i) => `
-                <div class="source-item" data-source-file="${s}" onclick="window.app.openArtifact('${s.replace(/'/g, "\\'")}'.toString(), this)">
+            const footerItems = Array.from(uniqueSources.values()).map((s, i) => {
+                // Detect web source: either WEB:: prefix or Source N (alias, last resort)
+                const isWebEntry = s.startsWith('WEB::') || /^Source\s+\d+$/.test(s);
+                let displayLabel = s;
+                let domainLabel = '';
+                let iconHtml = '<i class="fa-solid fa-file-shield"></i>';
+                if (isWebEntry && s.startsWith('WEB::')) {
+                    // Parse: WEB::<url>::<title (date)>
+                    const parts = s.split('::');
+                    const rawUrl = parts[1] || '';
+                    displayLabel = parts.slice(2).join('::') || rawUrl;
+                    // Strip date suffix for compact display
+                    displayLabel = displayLabel.replace(/\s*\(\d{4}-\d{2}-\d{2}\)$/, '').trim();
+                    try { domainLabel = new URL(rawUrl).hostname.replace(/^www\./, ''); } catch (_) { }
+                    iconHtml = '<i class="fa-solid fa-globe text-cyan-400"></i>';
+                } else if (isWebEntry) {
+                    iconHtml = '<i class="fa-solid fa-globe text-cyan-400"></i>';
+                }
+                const safeKey = s.replace(/'/g, "\\'");
+                return `
+                <div class="source-item" data-source-file="${s}" onclick="window.app.openArtifact('${safeKey}'.toString(), this)">
                     <span class="source-index">${i + 1}</span>
-                    <span class="source-name" title="${s}">${s}</span>
+                    ${iconHtml}
+                    <span class="source-name" title="${s}">${isWebEntry && domainLabel ? `${displayLabel} <span style="opacity:.45;font-size:.7em">${domainLabel}</span>` : displayLabel}</span>
                 </div>
-            `).join('');
+            `}).join('');
 
             html += `
                 <div class="sources-footer">
@@ -1382,7 +1412,7 @@ class SpandaOSApp {
 
         // Walk up DOM to the wrapper element that holds data-feedback-* attributes
         const wrapper = bar.closest('[data-feedback-response]') ||
-                        bar.closest('.max-w-3xl');
+            bar.closest('.max-w-3xl');
 
         const query = wrapper?.dataset.feedbackQuery || '';
         const response = wrapper?.dataset.feedbackResponse || '';
@@ -1402,7 +1432,7 @@ class SpandaOSApp {
                     conversation_id: convId
                 })
             });
-        } catch(e) {
+        } catch (e) {
             console.error('[Feedback] POST failed:', e);
         }
 
@@ -1878,9 +1908,26 @@ class SpandaOSApp {
         content.innerHTML = `
             <div class="flex flex-col items-center justify-center h-64 gap-4">
                 <div class="w-12 h-12 border-4 border-cyan-500/20 border-t-cyan-500 rounded-full animate-spin"></div>
-                <div class="text-sm font-bold tracking-widest text-cyan-400 uppercase">Retrieving Artifact: ${sourceName}</div>
+                <div class="text-sm font-bold tracking-widest text-cyan-400 uppercase">Retrieving Artifact: ${sourceName.startsWith('WEB::') ? 'Web Source' : sourceName}</div>
             </div>
         `;
+
+        // ── Detect web source (key format: "WEB::<url>::<display_title>")
+        const isWebSource = sourceName.startsWith('WEB::');
+        let webUrl = '', webDisplayTitle = sourceName, webDomain = '', webDate = '';
+        if (isWebSource) {
+            const parts = sourceName.split('::');
+            webUrl = parts[1] || '';
+            webDisplayTitle = parts.slice(2).join('::') || webUrl;
+            // Extract domain for the badge
+            try { webDomain = new URL(webUrl).hostname.replace(/^www\./, ''); } catch (_) { }
+            // Extract date from display title if present (format: "title (YYYY-MM-DD)")
+            const dateMatch = webDisplayTitle.match(/\((\d{4}-\d{2}-\d{2})\)$/);
+            if (dateMatch) {
+                webDate = dateMatch[1];
+                webDisplayTitle = webDisplayTitle.slice(0, dateMatch.index).trim();
+            }
+        }
 
         try {
             const convId = this.state.activeConversation || '';
@@ -1918,11 +1965,45 @@ class SpandaOSApp {
                     } catch (_) { /* ignore JSON parse errors */ }
                 }
             }
-            // ────────────────────────────────────────────────────────────────────
+            // ── Resolve web metadata from chunk.url field ───────────────────────────────
+            // 'Source N' alias keys have chunks with a .url field. Detect web sources
+            // by checking the resolved chunk data, not just the sourceName prefix.
+            // This makes WEB:: detection work for any citation style the LLM used.
+            if (!isWebSource && perResponseFragments && perResponseFragments.length > 0) {
+                const firstChunk = perResponseFragments[0];
+                if (firstChunk && firstChunk.url) {
+                    // This is a web source reached via an alias key (e.g. 'Source 3')
+                    webUrl = firstChunk.url;
+                    webDisplayTitle = firstChunk.title || sourceName;
+                    try { webDomain = new URL(webUrl).hostname.replace(/^www\./, ''); } catch (_) { }
+                    const dateMatch = webDisplayTitle.match(/\((\d{4}-\d{2}-\d{2})\)$/);
+                    if (dateMatch) {
+                        webDate = dateMatch[1];
+                        webDisplayTitle = webDisplayTitle.slice(0, dateMatch.index).trim();
+                    }
+                    // Re-declare isWebSource as a let so we can reassign below
+                    // (we use Object.defineProperty trick to work around const)
+                    Object.defineProperty(window, '_spanda_isWeb_' + sourceName.replace(/\s/g, '_'), {
+                        writable: true, configurable: true, value: true
+                    });
+                }
+            }
+            // Unified web source flag: either WEB:: prefix OR chunk.url present
+            const isWebSourceFinal = isWebSource || (
+                perResponseFragments && perResponseFragments.length > 0 &&
+                !!(perResponseFragments[0] && perResponseFragments[0].url)
+            );
+            // Rebind locals for the rest of openArtifact
+            const effectiveIsWeb = isWebSourceFinal;
+            const effectiveWebUrl = webUrl;
+            const effectiveWebTitle = webDisplayTitle;
+            const effectiveDomain = webDomain;
+            const effectiveDate = webDate;
+            // ─────────────────────────────────────────────────────────────────
 
-            // Fetch full metadata only if we need it (non-media types or no per-response data)
+            // Fetch full metadata only if needed (not for web sources or media)
             let data = { success: true, chunks: [], total_chunks: 0, type: 'unknown', metadata: null };
-            if (!isPerResponse || !isMedia) {
+            if (!effectiveIsWeb && (!isPerResponse || !isMedia)) {
                 try {
                     const resp = await fetch(`/api/workspace/files/${encodeURIComponent(sourceName)}/details?conversation_id=${convId}`);
                     const fetched = await resp.json();
@@ -1932,7 +2013,33 @@ class SpandaOSApp {
 
             // ── Media Preview Block ──
             let mediaHtml = '';
-            if (isImage) {
+            if (effectiveIsWeb) {
+                // ── Web Source: Globe icon + clickable URL + domain badge ──
+                const fragCount = perResponseFragments ? perResponseFragments.length : 0;
+                mediaHtml = `
+                    <div class="rounded-xl border border-cyan-500/20 bg-cyan-950/20 overflow-hidden">
+                        <div class="flex items-center gap-3 px-4 py-3 bg-cyan-500/10 border-b border-cyan-500/15">
+                            <i class="fa-solid fa-globe text-cyan-400 text-lg"></i>
+                            <div class="flex-1 min-w-0">
+                                <div class="text-xs font-bold text-white/80 truncate">${effectiveWebTitle}</div>
+                                <div class="text-[10px] text-cyan-400/60 font-mono mt-0.5">${effectiveDomain}</div>
+                            </div>
+                            ${effectiveDate ? `<span class="text-[9px] px-2 py-0.5 bg-white/5 rounded-full text-white/40 font-mono shrink-0">${effectiveDate}</span>` : ''}
+                        </div>
+                        <div class="px-4 py-3 flex items-center justify-between gap-3">
+                            <div class="text-[10px] text-cyan-400/60 font-mono">
+                                <i class="fa-solid fa-microscope mr-1"></i>
+                                ${fragCount} web chunk${fragCount !== 1 ? 's' : ''} retrieved
+                            </div>
+                            <a href="${effectiveWebUrl}" target="_blank" rel="noopener noreferrer"
+                               class="flex items-center gap-1.5 px-3 py-1.5 bg-cyan-500/15 hover:bg-cyan-500/25
+                                      text-cyan-300 text-[11px] font-semibold rounded-lg transition-colors shrink-0">
+                                <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+                                Open URL
+                            </a>
+                        </div>
+                    </div>`;
+            } else if (isImage) {
                 mediaHtml = `
                     <div class="flex items-center justify-center p-2 bg-black/60 rounded-xl min-h-[200px]">
                         <img src="${fileUrl}" alt="${sourceName}"
@@ -1983,7 +2090,7 @@ class SpandaOSApp {
 
             // ── Fragment Display ──
             const fragments = isPerResponse ? (perResponseFragments || []) : (data.chunks || []);
-            const fragmentLabel = isPerResponse ? 'Response Fragments' : 'Neural Content Fragments';
+            const fragmentLabel = isWebSource ? 'Scraped Web Content' : (isPerResponse ? 'Response Fragments' : 'Neural Content Fragments');
             const SHOW_MORE_THRESHOLD = 600; // chars
 
             let chunksHtml = '';
@@ -2018,18 +2125,25 @@ class SpandaOSApp {
                 <div class="artifact-stage animate-slide-down">
                     <div class="mb-6 pb-4 border-b border-white/10 flex justify-between items-center">
                         <div>
-                            <h1 class="text-2xl font-black text-white tracking-tight break-all">${sourceName}</h1>
+                            <h1 class="text-2xl font-black text-white tracking-tight break-all">${effectiveIsWeb ? effectiveWebTitle : sourceName}</h1>
                             <div class="text-[10px] uppercase tracking-widest text-white/40 font-bold mt-1">
-                                ${isVisual ? '<i class="fa-solid fa-eye-low-vision text-cyan-400"></i> Visual Artifact' :
-                    isAudio ? '<i class="fa-solid fa-waveform-lines text-purple-400"></i> Audio Artifact' :
-                        isPdf ? '<i class="fa-solid fa-file-pdf text-red-400"></i> Document' :
-                            '<i class="fa-solid fa-file-shield text-emerald-400"></i> Grounded Context'}
+                                ${effectiveIsWeb ? '<i class="fa-solid fa-globe text-cyan-400"></i> Live Web Source' :
+                    isVisual ? '<i class="fa-solid fa-eye-low-vision text-cyan-400"></i> Visual Artifact' :
+                        isAudio ? '<i class="fa-solid fa-waveform-lines text-purple-400"></i> Audio Artifact' :
+                            isPdf ? '<i class="fa-solid fa-file-pdf text-red-400"></i> Document' :
+                                '<i class="fa-solid fa-file-shield text-emerald-400"></i> Grounded Context'}
                             </div>
                         </div>
                         <div class="flex items-center gap-2">
-                            <a href="${downloadUrl}" title="Download" class="p-2 hover:bg-white/10 rounded-full transition-colors text-white/60 hover:text-white">
-                                <i class="fa-solid fa-download text-sm"></i>
-                            </a>
+                            ${effectiveIsWeb
+                    ? `<a href="${effectiveWebUrl}" target="_blank" rel="noopener noreferrer" title="Open source URL"
+                                      class="p-2 hover:bg-white/10 rounded-full transition-colors text-cyan-400/70 hover:text-cyan-300">
+                                      <i class="fa-solid fa-arrow-up-right-from-square text-sm"></i>
+                                   </a>`
+                    : `<a href="${downloadUrl}" title="Download" class="p-2 hover:bg-white/10 rounded-full transition-colors text-white/60 hover:text-white">
+                                      <i class="fa-solid fa-download text-sm"></i>
+                                   </a>`
+                }
                             <button onclick="document.getElementById('sourceExplorer').classList.add('translate-x-full')" class="p-2 hover:bg-white/10 rounded-full transition-colors">
                                 <i class="fa-solid fa-xmark"></i>
                             </button>
@@ -2054,8 +2168,9 @@ class SpandaOSApp {
                         <div class="text-[10px] uppercase font-bold tracking-widest text-white/30 mb-4">Internal Meta-Data</div>
                         <div class="space-y-2">
                             <div class="flex justify-between text-[11px] font-mono"><span class="opacity-40">Status</span><span class="text-green-400">Grounded</span></div>
-                            <div class="flex justify-between text-[11px] font-mono"><span class="opacity-40">Persistence</span><span class="text-cyan-400">Converged</span></div>
-                            <div class="flex justify-between text-[11px] font-mono"><span class="opacity-40">Type</span><span class="text-white">${(data.type && data.type.toLowerCase() !== 'unknown') ? data.type : (ext ? ext.toUpperCase() : 'Unknown')}</span></div>
+                            <div class="flex justify-between text-[11px] font-mono"><span class="opacity-40">Persistence</span><span class="text-cyan-400">${effectiveIsWeb ? 'Ephemeral' : 'Converged'}</span></div>
+                            <div class="flex justify-between text-[11px] font-mono"><span class="opacity-40">Type</span><span class="text-white">${effectiveIsWeb ? 'WEB' : ((data.type && data.type.toLowerCase() !== 'unknown') ? data.type : (ext ? ext.toUpperCase() : 'Unknown'))}</span></div>
+                            ${effectiveIsWeb ? `<div class="flex justify-between text-[11px] font-mono"><span class="opacity-40">Source URL</span><a href="${effectiveWebUrl}" target="_blank" rel="noopener noreferrer" class="text-cyan-400 hover:underline truncate max-w-[180px]">${effectiveDomain}</a></div>` : ''}
                             ${isPerResponse ? `<div class="flex justify-between text-[11px] font-mono"><span class="opacity-40">Fragment Scope</span><span class="text-cyan-400">Per-Response</span></div>` : ''}
                         </div>
                     </div>
